@@ -17,6 +17,7 @@ package path
 import (
 	"fmt"
 	"reflect"
+	"regexp"
 
 	"github.com/google/cayley/graph"
 	"github.com/google/cayley/graph/iterator"
@@ -98,6 +99,38 @@ func hasMorphism(via interface{}, nodes ...string) morphism {
 			}
 
 			// This looks backwards. That's OK-- see the note above.
+			route := join(qs, dest, trail)
+			has := iterator.NewHasA(qs, route, quad.Subject)
+			return join(qs, has, in), ctx
+		},
+	}
+}
+
+func hasRegexMorphism(via interface{}, pattern string) morphism {
+	return morphism{
+		Name:     "hasregex",
+		Reversal: func(ctx *context) (morphism, *context) { return hasRegexMorphism(via, pattern), ctx },
+		Apply: func(qs graph.QuadStore, in graph.Iterator, ctx *context) (graph.Iterator, *context) {
+			viaIter := buildViaPath(qs, via).
+				BuildIterator()
+			ends := func() graph.Iterator {
+				re := regexp.MustCompile(pattern)
+
+				fixed := qs.FixedIterator()
+				// Iterate over every node in the store, adding those that
+				// match the pattern as reverse edge search candidates
+				for i := int64(0); i < qs.Size(); i++ {
+					if re.MatchString(qs.NameOf(i)) {
+						fixed.Add(i)
+					}
+				}
+				return fixed
+			}()
+
+			trail := iterator.NewLinksTo(qs, viaIter, quad.Predicate)
+			dest := iterator.NewLinksTo(qs, ends, quad.Object)
+
+			// Reverse lookup from candidates back to source
 			route := join(qs, dest, trail)
 			has := iterator.NewHasA(qs, route, quad.Subject)
 			return join(qs, has, in), ctx
