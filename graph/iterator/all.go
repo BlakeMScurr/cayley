@@ -100,7 +100,7 @@ func (it *Int64) Describe() graph.Description {
 
 // Next() on an Int64 all iterator is a simple incrementing counter.
 // Return the next integer, and mark it as the result.
-func (it *Int64) Next() bool {
+func (it *Int64) Next(ctx *graph.IterationContext) bool {
 	graph.NextLogIn(it)
 	it.runstats.Next += 1
 	if it.at == -1 {
@@ -146,8 +146,8 @@ func (it *Int64) Size() (int64, bool) {
 	return Size, true
 }
 
-func valToInt64(v graph.Value) int64{
-	if v, ok := v.(Int64Node); ok{
+func valToInt64(v graph.Value) int64 {
+	if v, ok := v.(Int64Node); ok {
 		return int64(v)
 	}
 	return int64(v.(Int64Quad))

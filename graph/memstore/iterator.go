@@ -118,13 +118,13 @@ func (it *Iterator) checkValid(index int64) bool {
 	return it.qs.log[index].DeletedBy == 0
 }
 
-func (it *Iterator) Next() bool {
+func (it *Iterator) Next(ctx *graph.IterationContext) bool {
 	graph.NextLogIn(it)
 	if it.iter == nil {
 		return graph.NextLogOut(it, false)
 	}
 	for {
-		result, _, err := it.iter.Next()
+		result, _, err := it.iter.Next(ctx)
 		if err != nil {
 			if err != io.EOF {
 				it.err = err

@@ -165,7 +165,7 @@ func (it *HasA) Contains(val graph.Value) bool {
 // result iterator (a quad iterator based on the last checked value) and returns true if
 // another match is made.
 func (it *HasA) NextContains() bool {
-	for it.resultIt.Next() {
+	for it.resultIt.Next(nil) {
 		it.runstats.ContainsNext += 1
 		link := it.resultIt.Result()
 		if clog.V(4) {
@@ -212,7 +212,7 @@ func (it *HasA) NextPath() bool {
 // Next advances the iterator. This is simpler than Contains. We have a
 // subiterator we can get a value from, and we can take that resultant quad,
 // pull our direction out of it, and return that.
-func (it *HasA) Next() bool {
+func (it *HasA) Next(ctx *graph.IterationContext) bool {
 	graph.NextLogIn(it)
 	it.runstats.Next += 1
 	if it.resultIt != nil {
@@ -220,7 +220,7 @@ func (it *HasA) Next() bool {
 	}
 	it.resultIt = &Null{}
 
-	if !it.primaryIt.Next() {
+	if !it.primaryIt.Next(ctx) {
 		it.err = it.primaryIt.Err()
 		return graph.NextLogOut(it, false)
 	}

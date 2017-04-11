@@ -3,6 +3,7 @@ package graph
 import (
 	"encoding/json"
 	"fmt"
+
 	"github.com/codelingo/cayley/clog"
 	"github.com/codelingo/cayley/quad"
 	"golang.org/x/net/context"
@@ -41,7 +42,8 @@ func (c *IterateChain) next() bool {
 		return false
 	default:
 	}
-	ok := (c.limit < 0 || c.n < c.limit) && c.it.Next()
+
+	ok := (c.limit < 0 || c.n < c.limit) && c.it.Next(nil)
 	if ok {
 		c.n++
 	}

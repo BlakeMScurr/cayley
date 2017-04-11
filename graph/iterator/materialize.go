@@ -185,7 +185,7 @@ func (it *Materialize) Stats() graph.IteratorStats {
 	}
 }
 
-func (it *Materialize) Next() bool {
+func (it *Materialize) Next(ctx *graph.IterationContext) bool {
 	graph.NextLogIn(it)
 	it.runstats.Next += 1
 	if !it.hasRun {
@@ -195,7 +195,7 @@ func (it *Materialize) Next() bool {
 		return false
 	}
 	if it.aborted {
-		n := it.subIt.Next()
+		n := it.subIt.Next(ctx)
 		it.err = it.subIt.Err()
 		return n
 	}
@@ -255,7 +255,7 @@ func (it *Materialize) NextPath() bool {
 
 func (it *Materialize) materializeSet() {
 	i := 0
-	for it.subIt.Next() {
+	for it.subIt.Next(nil) {
 		i++
 		if i > abortMaterializeAt {
 			it.aborted = true
