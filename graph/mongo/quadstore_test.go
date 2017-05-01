@@ -3,11 +3,10 @@
 package mongo
 
 import (
-	"testing"
-
 	"bytes"
 	"math/rand"
 	"sync"
+	"testing"
 
 	"github.com/codelingo/cayley/graph"
 	"github.com/codelingo/cayley/graph/graphtest"
@@ -19,7 +18,7 @@ import (
 func makeMongo(t testing.TB) (graph.QuadStore, graph.Options, func()) {
 	var conf dock.Config
 
-	conf.Image = "mongo:3.2.12"
+	conf.Image = "mongo:3"
 	conf.OpenStdin = true
 	conf.Tty = true
 

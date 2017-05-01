@@ -21,14 +21,13 @@ Its goal is to be a part of the developer's toolbox where [Linked Data](http://l
   * or a REPL if you prefer
 * Built-in query editor and visualizer
 * Multiple query languages:
-  * [Gizmo](./docs/GremlinAPI.md) - a JavaScript, with a [Gremlin](http://gremlindocs.com/)-inspired\* graph object.
+  * [Gizmo](./docs/GizmoAPI.md) - a JavaScript, with a [Gremlin](http://gremlindocs.com/)-inspired\* graph object.
   * [GraphQL](./docs/GraphQL.md)-inspired\* query language.
   * (simplified) [MQL](./docs/MQL.md), for [Freebase](https://en.wikipedia.org/wiki/Freebase) fans
 * Plays well with multiple backend stores:
-  * [LevelDB](https://github.com/google/leveldb)
-  * [Bolt](https://github.com/boltdb/bolt)
-  * [PostgreSQL](http://www.postgresql.org)
-  * [MongoDB](https://www.mongodb.org) for distributed stores
+  * KVs: [Bolt](https://github.com/boltdb/bolt), [LevelDB](https://github.com/google/leveldb)
+  * NoSQL: [MongoDB](https://www.mongodb.org)
+  * SQL: [PostgreSQL](http://www.postgresql.org), [CockroachDB](https://www.cockroachlabs.com), [MySQL](https://www.mysql.com)
   * In-memory, ephemeral
 * Modular design; easy to extend with new languages and backends
 * Good test coverage

@@ -30,9 +30,9 @@ import (
 	_ "github.com/codelingo/cayley/graph/gaedatastore"
 	_ "github.com/codelingo/cayley/writer"
 
+	// Register supported query languages
 	_ "github.com/codelingo/cayley/query/gizmo"
 	_ "github.com/codelingo/cayley/query/graphql"
-	_ "github.com/codelingo/cayley/query/gremlin"
 	_ "github.com/codelingo/cayley/query/mql"
 )
 
@@ -40,7 +40,7 @@ var (
 	quadFile           = ""
 	quadType           = "cquad"
 	cpuprofile         = ""
-	queryLanguage      = "gremlin"
+	queryLanguage      = "gizmo"
 	configFile         = ""
 	databasePath       = ""
 	databaseBackend    = "gaedatastore"
