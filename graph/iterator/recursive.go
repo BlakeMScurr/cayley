@@ -2,7 +2,6 @@ package iterator
 
 import (
 	"math"
-	"reflect"
 
 	"github.com/codelingo/cayley/graph"
 	"github.com/codelingo/cayley/quad"
@@ -103,7 +102,6 @@ func (it *Recursive) TagResults(dst map[string]graph.Value) {
 			dst[k] = v
 		}
 	}
-
 }
 
 func (it *Recursive) Clone() graph.Iterator {
@@ -196,12 +194,14 @@ func (it *Recursive) getBaseValue(val graph.Value) graph.Value {
 func (it *Recursive) ResetIfVarsUpdated(ctx *graph.IterationContext) {
 	if ctx != nil {
 		newVars := ctx.Values()
-		// Using reflect is not ideal, and we should also not be throwing all this
-		// information away, it could be useful if we have the same var value at a
-		// later point.
-		if !reflect.DeepEqual(newVars, it.vars) {
-			it.Reset()
-			it.vars = newVars
+		// We should not be throwing all this information away, it could be
+		// useful if we have the same var value at a later point.
+		for name, _ := range newVars {
+			if newVars[name] != it.vars[name] {
+				it.Reset()
+				it.vars = newVars
+				return
+			}
 		}
 	}
 }

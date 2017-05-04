@@ -490,8 +490,8 @@ func buildHas(qs graph.QuadStore, via interface{}, in graph.Iterator, reverse bo
 
 		if len(nodes) == 1 {
 			switch p := nodes[0].(type) {
-			case graph.Var:
-				return iterator.NewVariable(qs, p.String())
+			case Var:
+				return iterator.NewVariable(qs, p.String(), p.Operator())
 			}
 		}
 

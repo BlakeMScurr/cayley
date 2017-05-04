@@ -33,9 +33,9 @@ func init() {
 		NewFunc: func(string, graph.Options) (graph.QuadStore, error) {
 			return newQuadStore(), nil
 		},
-		UpgradeFunc:       nil,
-		InitFunc:          nil,
-		IsPersistent:      false,
+		UpgradeFunc:  nil,
+		InitFunc:     nil,
+		IsPersistent: false,
 	})
 }
 
@@ -185,6 +185,10 @@ func (qs *QuadStore) ApplyDeltas(deltas []graph.Delta, ignoreOpts graph.IgnoreOp
 			return err
 		}
 	}
+	return nil
+}
+
+func (qs *QuadStore) ApplyDeltaStream(in <-chan graph.Delta, opts graph.IgnoreOpts) error {
 	return nil
 }
 

@@ -40,6 +40,7 @@ const (
 	CompareLTE
 	CompareGT
 	CompareGTE
+	CompareNoOp
 	// Why no Equals? Because that's usually an AndIterator.
 )
 
@@ -127,6 +128,8 @@ func RunIntOp(a quad.Int, op Operator, b quad.Int) bool {
 		return a > b
 	case CompareGTE:
 		return a >= b
+	case CompareNoOp:
+		return true
 	default:
 		panic("Unknown operator type")
 	}
@@ -142,6 +145,8 @@ func RunFloatOp(a quad.Float, op Operator, b quad.Float) bool {
 		return a > b
 	case CompareGTE:
 		return a >= b
+	case CompareNoOp:
+		return true
 	default:
 		panic("Unknown operator type")
 	}
@@ -157,6 +162,8 @@ func RunStrOp(a string, op Operator, b string) bool {
 		return a > b
 	case CompareGTE:
 		return a >= b
+	case CompareNoOp:
+		return true
 	default:
 		panic("Unknown operator type")
 	}
@@ -172,6 +179,8 @@ func RunTimeOp(a time.Time, op Operator, b time.Time) bool {
 		return a.After(b)
 	case CompareGTE:
 		return !a.Before(b)
+	case CompareNoOp:
+		return true
 	default:
 		panic("Unknown operator type")
 	}

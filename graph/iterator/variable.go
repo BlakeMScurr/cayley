@@ -45,13 +45,15 @@ type Variable struct {
 	result   graph.Value
 	isBinder bool
 	qs       graph.QuadStore
+	op       Operator
 }
 
-func NewVariable(qs graph.QuadStore, name string) *Variable {
+func NewVariable(qs graph.QuadStore, name string, op Operator) *Variable {
 	it := &Variable{
 		uid:     NextUID(),
 		varName: name,
 		qs:      qs,
+		op:      op,
 	}
 	return it
 }
@@ -82,7 +84,7 @@ func (it *Variable) TagResults(dst map[string]graph.Value) {
 }
 
 func (it *Variable) Clone() graph.Iterator {
-	out := NewVariable(it.qs, it.varName)
+	out := NewVariable(it.qs, it.varName, it.op)
 	out.tags.CopyFrom(it)
 	return out
 }

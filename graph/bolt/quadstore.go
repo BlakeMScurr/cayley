@@ -33,10 +33,10 @@ import (
 
 func init() {
 	graph.RegisterQuadStore(QuadStoreType, graph.QuadStoreRegistration{
-		NewFunc:           newQuadStore,
-		UpgradeFunc:       upgradeBolt,
-		InitFunc:          createNewBolt,
-		IsPersistent:      true,
+		NewFunc:      newQuadStore,
+		UpgradeFunc:  upgradeBolt,
+		InitFunc:     createNewBolt,
+		IsPersistent: true,
 	})
 }
 
@@ -305,6 +305,10 @@ func (qs *QuadStore) ApplyDeltas(deltas []graph.Delta, ignoreOpts graph.IgnoreOp
 		qs.size = oldSize
 	}
 	return err
+}
+
+func (qs *QuadStore) ApplyDeltaStream(in <-chan graph.Delta, opts graph.IgnoreOpts) error {
+	return nil
 }
 
 func (qs *QuadStore) buildQuadWrite(tx *bolt.Tx, q quad.Quad, id int64, isAdd bool) error {
