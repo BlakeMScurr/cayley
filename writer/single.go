@@ -93,32 +93,20 @@ func (s *Single) AddQuadSet(set []quad.Quad) error {
 
 func (s *Single) AddQuadStream(quads <-chan quad.Quad) error {
 	deltas := make(chan graph.Delta)
-	errs := make(chan error)
-	defer close(errs)
-	defer close(deltas)
 
 	go func() {
-		if err := s.qs.ApplyDeltaStream(deltas, s.ignoreOpts); err != nil {
-			errs <- err
-		}
-	}()
-
-	for {
-		select {
-		case q, ok := <-quads:
-			if !ok {
-				return nil
-			}
+		defer close(deltas)
+		for q := range quads {
 			deltas <- graph.Delta{
 				ID:        s.currentID.Next(),
 				Quad:      q,
 				Action:    graph.Add,
 				Timestamp: time.Now(),
 			}
-		case err := <-errs:
-			return err
 		}
-	}
+	}()
+
+	return s.qs.ApplyDeltaStream(deltas, s.ignoreOpts)
 }
 
 func (s *Single) RemoveQuad(q quad.Quad) error {
