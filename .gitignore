@@ -11,3 +11,4 @@ cayley.json
 # The built binary
 /cayley
 /vendor
+.idea/
