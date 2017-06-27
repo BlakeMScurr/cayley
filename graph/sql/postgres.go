@@ -239,7 +239,7 @@ func runChanTxPostgres(tx *sql.Tx, tx2 *sql.Tx, in <-chan graph.Delta, opts grap
 	// nodes tb needs to be set up before quads
 	wg.Wait()
 
-	_, err := tx2.Exec("INSERT INTO quads SELECT * FROM quads_copy;")
+	_, err := tx2.Exec("INSERT INTO quads (subject_hash, predicate_hash, object_hash, label_hash, id, ts) SELECT subject_hash, predicate_hash, object_hash, label_hash, id, ts FROM quads_copy;")
 	if err != nil {
 		panic(err)
 	}
