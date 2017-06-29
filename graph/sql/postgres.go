@@ -94,7 +94,7 @@ func runChanTxPostgres(tx *sql.Tx, tx2 *sql.Tx, in <-chan graph.Delta, opts grap
 	wg.Add(2)
 
 	go func() {
-		_, err := tx2.Exec("CREATE TEMP TABLE IF NOT EXISTS quads_copy (LIKE quads INCLUDING ALL);")
+		_, err := tx2.Exec("CREATE TEMP TABLE IF NOT EXISTS quads_copy (LIKE quads INCLUDING DEFAULTS);")
 		if err != nil {
 			panic(err)
 		}
@@ -133,7 +133,7 @@ func runChanTxPostgres(tx *sql.Tx, tx2 *sql.Tx, in <-chan graph.Delta, opts grap
 	}()
 
 	go func() {
-		_, err := tx.Exec("CREATE TEMP TABLE IF NOT EXISTS nodes_copy (LIKE nodes INCLUDING ALL);")
+		_, err := tx.Exec("CREATE TEMP TABLE IF NOT EXISTS nodes_copy (LIKE nodes INCLUDING DEFAULTS);")
 		if err != nil {
 			panic(err)
 		}
@@ -224,7 +224,7 @@ func runChanTxPostgres(tx *sql.Tx, tx2 *sql.Tx, in <-chan graph.Delta, opts grap
 		}
 
 		// sync copy tables back to nodes table
-		_, err = tx.Exec("INSERT INTO nodes SELECT * FROM nodes_copy" + doNothing + ";")
+		_, err = tx.Exec("INSERT INTO nodes SELECT DISTINCT ON (hash) * FROM nodes_copy" + doNothing + ";")
 		if err != nil {
 			panic(err)
 		}
@@ -239,7 +239,7 @@ func runChanTxPostgres(tx *sql.Tx, tx2 *sql.Tx, in <-chan graph.Delta, opts grap
 	// nodes tb needs to be set up before quads
 	wg.Wait()
 
-	_, err := tx2.Exec("INSERT INTO quads (subject_hash, predicate_hash, object_hash, label_hash, id, ts) SELECT subject_hash, predicate_hash, object_hash, label_hash, id, ts FROM quads_copy;")
+	_, err := tx2.Exec("INSERT INTO quads (subject_hash, predicate_hash, object_hash, label_hash, id, ts) SELECT DISTINCT ON (subject_hash, predicate_hash, object_hash, label_hash) subject_hash, predicate_hash, object_hash, label_hash, id, ts FROM quads_copy;")
 	if err != nil {
 		panic(err)
 	}
