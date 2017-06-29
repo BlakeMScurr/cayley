@@ -94,7 +94,7 @@ func runChanTxPostgres(tx *sql.Tx, tx2 *sql.Tx, in <-chan graph.Delta, opts grap
 	wg.Add(2)
 
 	go func() {
-		_, err := tx2.Exec("CREATE TEMP TABLE IF NOT EXISTS quads_copy (LIKE quads INCLUDING ALL);")
+		_, err := tx2.Exec("CREATE TEMP TABLE IF NOT EXISTS quads_copy (LIKE quads INCLUDING DEFAULTS);")
 		if err != nil {
 			panic(err)
 		}
@@ -133,7 +133,7 @@ func runChanTxPostgres(tx *sql.Tx, tx2 *sql.Tx, in <-chan graph.Delta, opts grap
 	}()
 
 	go func() {
-		_, err := tx.Exec("CREATE TEMP TABLE IF NOT EXISTS nodes_copy (LIKE nodes INCLUDING ALL);")
+		_, err := tx.Exec("CREATE TEMP TABLE IF NOT EXISTS nodes_copy (LIKE nodes INCLUDING DEFAULTS);")
 		if err != nil {
 			panic(err)
 		}
