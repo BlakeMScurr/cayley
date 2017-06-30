@@ -218,13 +218,8 @@ func runChanTxPostgres(tx *sql.Tx, tx2 *sql.Tx, in <-chan graph.Delta, opts grap
 		}
 		_ = nodeStmt.Close() // COPY will be closed on last Exec, this will return non-nil error in all cases
 
-		var doNothing string
-		if opts.IgnoreDup {
-			doNothing = " ON CONFLICT (hash) DO NOTHING"
-		}
-
 		// sync copy tables back to nodes table
-		_, err = tx.Exec("INSERT INTO nodes SELECT DISTINCT ON (hash) * FROM nodes_copy" + doNothing + ";")
+		_, err = tx.Exec("INSERT INTO nodes SELECT DISTINCT ON (hash) * FROM nodes_copy ON CONFLICT DO NOTHING;")
 		if err != nil {
 			panic(err)
 		}
@@ -239,7 +234,7 @@ func runChanTxPostgres(tx *sql.Tx, tx2 *sql.Tx, in <-chan graph.Delta, opts grap
 	// nodes tb needs to be set up before quads
 	wg.Wait()
 
-	_, err := tx2.Exec("INSERT INTO quads (subject_hash, predicate_hash, object_hash, label_hash, id, ts) SELECT DISTINCT ON (subject_hash, predicate_hash, object_hash, label_hash) subject_hash, predicate_hash, object_hash, label_hash, id, ts FROM quads_copy;")
+	_, err := tx2.Exec("INSERT INTO quads (subject_hash, predicate_hash, object_hash, label_hash, id, ts) SELECT DISTINCT ON (subject_hash, predicate_hash, object_hash, label_hash) subject_hash, predicate_hash, object_hash, label_hash, id, ts FROM quads_copy ON CONFLICT DO NOTHING;")
 	if err != nil {
 		panic(err)
 	}
