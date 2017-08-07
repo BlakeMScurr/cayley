@@ -125,7 +125,7 @@ func MakeQuadSet() []quad.Quad {
 
 func IteratedQuads(t testing.TB, qs graph.QuadStore, it graph.Iterator) []quad.Quad {
 	var res quad.ByQuadString
-	for it.Next() {
+	for it.Next(nil) {
 		res = append(res, qs.Quad(it.Result()))
 	}
 	require.Nil(t, it.Err())
@@ -165,7 +165,7 @@ func ExpectIteratedValues(t testing.TB, qs graph.QuadStore, it graph.Iterator, e
 
 func IteratedRawStrings(t testing.TB, qs graph.QuadStore, it graph.Iterator) []string {
 	var res []string
-	for it.Next() {
+	for it.Next(nil) {
 		res = append(res, qs.NameOf(it.Result()).String())
 	}
 	require.Nil(t, it.Err())
@@ -175,7 +175,7 @@ func IteratedRawStrings(t testing.TB, qs graph.QuadStore, it graph.Iterator) []s
 
 func IteratedValues(t testing.TB, qs graph.QuadStore, it graph.Iterator) []quad.Value {
 	var res []quad.Value
-	for it.Next() {
+	for it.Next(nil) {
 		res = append(res, qs.NameOf(it.Result()))
 	}
 	require.Nil(t, it.Err())
@@ -291,7 +291,7 @@ func TestIterator(t testing.TB, gen DatabaseFunc) {
 	}
 
 	for _, pq := range expect {
-		require.True(t, it.Contains(qs.ValueOf(quad.Raw(pq))), "Failed to find and check %q correctly", pq)
+		require.True(t, it.Contains(nil, qs.ValueOf(quad.Raw(pq))), "Failed to find and check %q correctly", pq)
 
 	}
 	// FIXME(kortschak) Why does this fail?
@@ -308,7 +308,7 @@ func TestIterator(t testing.TB, gen DatabaseFunc) {
 	optIt, changed = it.Optimize()
 	require.True(t, !changed && optIt == it, "Optimize unexpectedly changed iterator: %v, %T", changed, optIt)
 
-	require.True(t, it.Next())
+	require.True(t, it.Next(nil))
 
 	q := qs.Quad(it.Result())
 	require.Nil(t, it.Err())
@@ -685,7 +685,7 @@ func TestIteratorsAndNextResultOrderA(t testing.TB, gen DatabaseFunc) {
 	hasa := iterator.NewHasA(qs, innerAnd, quad.Subject)
 	outerAnd := iterator.NewAnd(qs, fixed, hasa)
 
-	require.True(t, outerAnd.Next(), "Expected one matching subtree")
+	require.True(t, outerAnd.Next(nil), "Expected one matching subtree")
 
 	val := outerAnd.Result()
 	require.Equal(t, quad.Raw("C"), qs.NameOf(val))
@@ -704,7 +704,7 @@ func TestIteratorsAndNextResultOrderA(t testing.TB, gen DatabaseFunc) {
 
 	require.Equal(t, expect, got)
 
-	require.True(t, !outerAnd.Next(), "More than one possible top level output?")
+	require.True(t, !outerAnd.Next(nil), "More than one possible top level output?")
 }
 
 const lt, lte, gt, gte = iterator.CompareLT, iterator.CompareLTE, iterator.CompareGT, iterator.CompareGTE
