@@ -29,6 +29,8 @@ type Recursive struct {
 	depthCache    []graph.Value
 	baseIt        graph.FixedIterator
 	vars          map[string]graph.Value
+	minDepth      int
+	maxDepth      int
 }
 
 type seenAt struct {
@@ -40,7 +42,7 @@ var _ graph.Iterator = &Recursive{}
 
 var MaxRecursiveSteps = 50
 
-func NewRecursive(qs graph.QuadStore, it graph.Iterator, morphism graph.ApplyMorphism) *Recursive {
+func NewRecursive(qs graph.QuadStore, it graph.Iterator, morphism graph.ApplyMorphism, max int) *Recursive {
 	return &Recursive{
 		uid:   NextUID(),
 		subIt: it,
@@ -52,6 +54,7 @@ func NewRecursive(qs graph.QuadStore, it graph.Iterator, morphism graph.ApplyMor
 		baseIt:        qs.FixedIterator(),
 		pathMap:       make(map[graph.Value][]map[string]graph.Value),
 		containsValue: nil,
+		maxDepth:      max,
 	}
 }
 
@@ -107,7 +110,7 @@ func (it *Recursive) TagResults(dst map[string]graph.Value) {
 }
 
 func (it *Recursive) Clone() graph.Iterator {
-	n := NewRecursive(it.qs, it.subIt.Clone(), it.morphism)
+	n := NewRecursive(it.qs, it.subIt.Clone(), it.morphism, it.maxDepth)
 	n.tags.CopyFrom(it)
 	n.depthTags.CopyFromTagger(&it.depthTags)
 	return n
@@ -135,12 +138,16 @@ func (it *Recursive) Next(ctx *graph.IterationContext) bool {
 		}
 	}
 	for {
+
 		ok := it.nextIt.Next(ctx)
 		if !ok {
 			if len(it.depthCache) == 0 {
 				return graph.NextLogOut(it, false)
 			}
 			it.depth++
+			if it.depth > it.maxDepth {
+				return graph.NextLogOut(it, false)
+			}
 			it.baseIt = it.qs.FixedIterator()
 			for _, x := range it.depthCache {
 				it.baseIt.Add(x)
@@ -150,6 +157,7 @@ func (it *Recursive) Next(ctx *graph.IterationContext) bool {
 			it.nextIt = it.morphism(it.qs, it.baseIt)
 			continue
 		}
+
 		val := it.nextIt.Result()
 		results := make(map[string]graph.Value)
 		it.nextIt.TagResults(results)
@@ -165,6 +173,7 @@ func (it *Recursive) Next(ctx *graph.IterationContext) bool {
 		it.result.val = val
 		it.containsValue = it.getBaseValue(val)
 		it.depthCache = append(it.depthCache, val)
+
 		break
 	}
 	return graph.NextLogOut(it, true)

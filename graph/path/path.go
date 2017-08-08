@@ -360,7 +360,7 @@ func (p *Path) FollowReverse(path *Path) *Path {
 // first time the result node was seen.
 //
 // This is a very expensive operation in practice. Be sure to use it wisely.
-func (p *Path) FollowRecursive(via interface{}, depthTags []string) *Path {
+func (p *Path) FollowRecursive(via interface{}, depthTags []string, max int) *Path {
 	var path *Path
 	switch v := via.(type) {
 	case string:
@@ -372,7 +372,7 @@ func (p *Path) FollowRecursive(via interface{}, depthTags []string) *Path {
 	default:
 		panic("did not pass a string predicate or a Path to FollowRecursive")
 	}
-	p.stack = append(p.stack, followRecursiveMorphism(path, depthTags))
+	p.stack = append(p.stack, followRecursiveMorphism(path, depthTags, max))
 	return p
 }
 
