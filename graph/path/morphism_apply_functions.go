@@ -393,14 +393,14 @@ func followMorphism(p *Path) morphism {
 	}
 }
 
-func followRecursiveMorphism(p *Path, depthTags []string) morphism {
+func followRecursiveMorphism(p *Path, depthTags []string, max int) morphism {
 	return morphism{
 		Name: "follow_recursive",
 		Reversal: func(ctx *pathContext) (morphism, *pathContext) {
-			return followRecursiveMorphism(p.Reverse(), depthTags), ctx
+			return followRecursiveMorphism(p.Reverse(), depthTags, max), ctx
 		},
 		Apply: func(qs graph.QuadStore, in graph.Iterator, ctx *pathContext) (graph.Iterator, *pathContext) {
-			it := iterator.NewRecursive(qs, in, p.Morphism())
+			it := iterator.NewRecursive(qs, in, p.Morphism(), max)
 			for _, s := range depthTags {
 				it.AddDepthTag(s)
 			}
