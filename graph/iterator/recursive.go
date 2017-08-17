@@ -19,10 +19,10 @@ type Recursive struct {
 
 	qs            graph.QuadStore
 	morphism      graph.ApplyMorphism
-	seen          map[graph.Value]seenAt
+	seen          map[interface{}]seenAt
 	nextIt        graph.Iterator
 	depth         int
-	pathMap       map[graph.Value][]map[string]graph.Value
+	pathMap       map[interface{}][]map[string]graph.Value
 	pathIndex     int
 	containsValue graph.Value
 	depthTags     graph.Tagger
@@ -49,10 +49,10 @@ func NewRecursive(qs graph.QuadStore, it graph.Iterator, morphism graph.ApplyMor
 
 		qs:            qs,
 		morphism:      morphism,
-		seen:          make(map[graph.Value]seenAt),
+		seen:          make(map[interface{}]seenAt),
 		nextIt:        &Null{},
 		baseIt:        qs.FixedIterator(),
-		pathMap:       make(map[graph.Value][]map[string]graph.Value),
+		pathMap:       make(map[interface{}][]map[string]graph.Value),
 		containsValue: nil,
 		maxDepth:      max,
 	}
@@ -67,8 +67,8 @@ func (it *Recursive) Reset() {
 	it.result.depth = 0
 	it.err = nil
 	it.subIt.Reset()
-	it.seen = make(map[graph.Value]seenAt)
-	it.pathMap = make(map[graph.Value][]map[string]graph.Value)
+	it.seen = make(map[interface{}]seenAt)
+	it.pathMap = make(map[interface{}][]map[string]graph.Value)
 	it.containsValue = nil
 	it.pathIndex = 0
 	it.nextIt = &Null{}
@@ -101,12 +101,17 @@ func (it *Recursive) TagResults(dst map[string]graph.Value) {
 		dst[tag] = value
 	}
 	if it.containsValue != nil {
-		m := it.pathMap[graph.ToKey(it.containsValue)][it.pathIndex]
-		for k, v := range m {
-			dst[k] = v
+		paths := it.pathMap[graph.ToKey(it.containsValue)]
+		if len(paths) != 0 {
+			for k, v := range paths[it.pathIndex] {
+				dst[k] = v
+			}
 		}
 	}
-
+	if it.nextIt != nil {
+		it.nextIt.TagResults(dst)
+		delete(dst, "__base_recursive")
+	}
 }
 
 func (it *Recursive) Clone() graph.Iterator {
@@ -237,7 +242,7 @@ func (it *Recursive) Contains(ctx *graph.IterationContext, val graph.Value) bool
 }
 
 func (it *Recursive) NextPath(ctx *graph.IterationContext) bool {
-	if len(it.pathMap[graph.ToKey(it.containsValue)]) <= it.pathIndex+1 {
+	if it.pathIndex+1 >= len(it.pathMap[graph.ToKey(it.containsValue)]) {
 		return false
 	}
 	it.pathIndex++

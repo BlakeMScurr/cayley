@@ -1,7 +1,8 @@
-package iterator
+package iterator_test
 
 import (
 	"github.com/codelingo/cayley/graph"
+	. "github.com/codelingo/cayley/graph/iterator"
 )
 
 // A testing iterator that returns the given values for Next() and Err().

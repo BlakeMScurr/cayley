@@ -22,7 +22,7 @@ import (
 	"github.com/codelingo/cayley/graph"
 )
 
-var abortMaterializeAt = 1000
+const MaterializeLimit = 1000
 
 type result struct {
 	id   graph.Value
@@ -32,9 +32,10 @@ type result struct {
 type Materialize struct {
 	uid         uint64
 	tags        graph.Tagger
-	containsMap map[graph.Value]int
+	containsMap map[interface{}]int
 	values      [][]result
 	actualSize  int64
+	expectSize  int64
 	index       int
 	subindex    int
 	subIt       graph.Iterator
@@ -45,9 +46,14 @@ type Materialize struct {
 }
 
 func NewMaterialize(sub graph.Iterator) *Materialize {
+	return NewMaterializeWithSize(sub, 0)
+}
+
+func NewMaterializeWithSize(sub graph.Iterator, size int64) *Materialize {
 	return &Materialize{
 		uid:         NextUID(),
-		containsMap: make(map[graph.Value]int),
+		expectSize:  size,
+		containsMap: make(map[interface{}]int),
 		subIt:       sub,
 		index:       -1,
 	}
@@ -173,7 +179,15 @@ func (it *Materialize) Size() (int64, bool) {
 // putting it all up front.
 func (it *Materialize) Stats() graph.IteratorStats {
 	overhead := int64(2)
-	size, exact := it.Size()
+	var (
+		size  int64
+		exact bool
+	)
+	if it.expectSize > 0 {
+		size, exact = it.expectSize, false
+	} else {
+		size, exact = it.Size()
+	}
 	subitStats := it.subIt.Stats()
 	return graph.IteratorStats{
 		ContainsCost: overhead * subitStats.NextCost,
@@ -255,9 +269,10 @@ func (it *Materialize) NextPath(ctx *graph.IterationContext) bool {
 
 func (it *Materialize) materializeSet(ctx *graph.IterationContext) {
 	i := 0
-	for it.subIt.Next(ctx) {
+	mn := 0
+	for it.subIt.Next(nil) {
 		i++
-		if i > abortMaterializeAt {
+		if i > MaterializeLimit {
 			it.aborted = true
 			break
 		}
@@ -268,18 +283,24 @@ func (it *Materialize) materializeSet(ctx *graph.IterationContext) {
 			it.values = append(it.values, nil)
 		}
 		index := it.containsMap[val]
-		tags := make(map[string]graph.Value)
+		tags := make(map[string]graph.Value, mn)
 		it.subIt.TagResults(tags)
+		if n := len(tags); n > mn {
+			n = mn
+		}
 		it.values[index] = append(it.values[index], result{id: id, tags: tags})
 		it.actualSize += 1
 		for it.subIt.NextPath(ctx) {
 			i++
-			if i > abortMaterializeAt {
+			if i > MaterializeLimit {
 				it.aborted = true
 				break
 			}
-			tags := make(map[string]graph.Value)
+			tags := make(map[string]graph.Value, mn)
 			it.subIt.TagResults(tags)
+			if n := len(tags); n > mn {
+				n = mn
+			}
 			it.values[index] = append(it.values[index], result{id: id, tags: tags})
 			it.actualSize += 1
 		}

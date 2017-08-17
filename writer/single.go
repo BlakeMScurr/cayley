@@ -15,8 +15,6 @@
 package writer
 
 import (
-	"time"
-
 	"github.com/codelingo/cayley/graph"
 	"github.com/codelingo/cayley/quad"
 )
@@ -26,9 +24,15 @@ func init() {
 }
 
 type Single struct {
-	currentID  graph.PrimaryKey
 	qs         graph.QuadStore
 	ignoreOpts graph.IgnoreOpts
+}
+
+func NewSingle(qs graph.QuadStore, opts graph.IgnoreOpts) (graph.QuadWriter, error) {
+	return &Single{
+		qs:         qs,
+		ignoreOpts: opts,
+	}, nil
 }
 
 func NewSingleReplication(qs graph.QuadStore, opts graph.Options) (graph.QuadWriter, error) {
@@ -56,23 +60,17 @@ func NewSingleReplication(qs graph.QuadStore, opts graph.Options) (graph.QuadWri
 		}
 	}
 
-	return &Single{
-		currentID: qs.Horizon(),
-		qs:        qs,
-		ignoreOpts: graph.IgnoreOpts{
-			IgnoreDup:     ignoreDuplicate,
-			IgnoreMissing: ignoreMissing,
-		},
-	}, nil
+	return NewSingle(qs, graph.IgnoreOpts{
+		IgnoreMissing: ignoreMissing,
+		IgnoreDup:     ignoreDuplicate,
+	})
 }
 
 func (s *Single) AddQuad(q quad.Quad) error {
 	deltas := make([]graph.Delta, 1)
 	deltas[0] = graph.Delta{
-		ID:        s.currentID.Next(),
-		Quad:      q,
-		Action:    graph.Add,
-		Timestamp: time.Now(),
+		Quad:   q,
+		Action: graph.Add,
 	}
 	return s.qs.ApplyDeltas(deltas, s.ignoreOpts)
 }
@@ -81,13 +79,10 @@ func (s *Single) AddQuadSet(set []quad.Quad) error {
 	deltas := make([]graph.Delta, len(set))
 	for i, q := range set {
 		deltas[i] = graph.Delta{
-			ID:        s.currentID.Next(),
-			Quad:      q,
-			Action:    graph.Add,
-			Timestamp: time.Now(),
+			Quad:   q,
+			Action: graph.Add,
 		}
 	}
-
 	return s.qs.ApplyDeltas(deltas, s.ignoreOpts)
 }
 
@@ -98,10 +93,8 @@ func (s *Single) AddQuadStream(quads <-chan quad.Quad) error {
 		defer close(deltas)
 		for q := range quads {
 			deltas <- graph.Delta{
-				ID:        s.currentID.Next(),
-				Quad:      q,
-				Action:    graph.Add,
-				Timestamp: time.Now(),
+				Quad:   q,
+				Action: graph.Add,
 			}
 		}
 	}()
@@ -112,26 +105,26 @@ func (s *Single) AddQuadStream(quads <-chan quad.Quad) error {
 func (s *Single) RemoveQuad(q quad.Quad) error {
 	deltas := make([]graph.Delta, 1)
 	deltas[0] = graph.Delta{
-		ID:        s.currentID.Next(),
-		Quad:      q,
-		Action:    graph.Delete,
-		Timestamp: time.Now(),
+		Quad:   q,
+		Action: graph.Delete,
 	}
 	return s.qs.ApplyDeltas(deltas, s.ignoreOpts)
 }
 
 // RemoveNode removes all quads with the given value
-func (s *Single) RemoveNode(v graph.Value) error {
+func (s *Single) RemoveNode(v quad.Value) error {
+	gv := s.qs.ValueOf(v)
+	if gv == nil {
+		return nil
+	}
 	var deltas []graph.Delta
 	// TODO(dennwc): QuadStore may remove node without iterations. Consider optional interface for this.
 	for _, d := range []quad.Direction{quad.Subject, quad.Predicate, quad.Object, quad.Label} {
-		it := s.qs.QuadIterator(d, v)
+		it := s.qs.QuadIterator(d, gv)
 		for it.Next(nil) {
 			deltas = append(deltas, graph.Delta{
-				ID:        s.currentID.Next(),
-				Quad:      s.qs.Quad(it.Result()),
-				Action:    graph.Delete,
-				Timestamp: time.Now(),
+				Quad:   s.qs.Quad(it.Result()),
+				Action: graph.Delete,
 			})
 		}
 		it.Close()
@@ -145,10 +138,5 @@ func (s *Single) Close() error {
 }
 
 func (s *Single) ApplyTransaction(t *graph.Transaction) error {
-	ts := time.Now()
-	for i := 0; i < len(t.Deltas); i++ {
-		t.Deltas[i].ID = s.currentID.Next()
-		t.Deltas[i].Timestamp = ts
-	}
 	return s.qs.ApplyDeltas(t.Deltas, s.ignoreOpts)
 }

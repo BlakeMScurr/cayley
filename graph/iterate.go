@@ -1,12 +1,12 @@
 package graph
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
 	"github.com/codelingo/cayley/clog"
 	"github.com/codelingo/cayley/quad"
-	"golang.org/x/net/context"
 )
 
 // IterateChain is a chain-enabled helper to setup iterator execution.
@@ -197,6 +197,16 @@ iteration:
 	return out, c.it.Err()
 }
 
+// First will return a first result of an iterator. It returns nil if iterator is empty.
+func (c *IterateChain) First() (Value, error) {
+	c.start()
+	defer c.end()
+	if !c.next() {
+		return nil, c.it.Err()
+	}
+	return c.it.Result(), nil
+}
+
 // Send will send each result of the iterator to the provided channel.
 //
 // Channel will NOT be closed when function returns.
@@ -227,14 +237,18 @@ func (c *IterateChain) TagEach(fnc func(map[string]Value)) error {
 	defer c.end()
 	done := c.ctx.Done()
 
+	mn := 0
 	for c.next() {
 		select {
 		case <-done:
 			return c.ctx.Err()
 		default:
 		}
-		tags := make(map[string]Value)
+		tags := make(map[string]Value, mn)
 		c.it.TagResults(tags)
+		if n := len(tags); n > mn {
+			mn = n
+		}
 		fnc(tags)
 		for c.nextPath(nil) {
 			select {
@@ -242,8 +256,11 @@ func (c *IterateChain) TagEach(fnc func(map[string]Value)) error {
 				return c.ctx.Err()
 			default:
 			}
-			tags := make(map[string]Value)
+			tags := make(map[string]Value, mn)
 			c.it.TagResults(tags)
+			if n := len(tags); n > mn {
+				mn = n
+			}
 			fnc(tags)
 		}
 	}
@@ -294,6 +311,22 @@ func (c *IterateChain) AllValues(qs QuadStore) ([]quad.Value, error) {
 		out = append(out, v)
 	})
 	return out, err
+}
+
+// FirstValue is an analog of First, but it does lookup of a value in QuadStore.
+func (c *IterateChain) FirstValue(qs QuadStore) (quad.Value, error) {
+	if qs != nil {
+		c.qs = qs
+	}
+	if c.qs == nil {
+		return nil, errNoQuadStore
+	}
+	v, err := c.First()
+	if err != nil || v == nil {
+		return nil, err
+	}
+	// TODO: return an error from NameOf once we have it exposed
+	return c.qs.NameOf(v), nil
 }
 
 // SendValues is an analog of Send, but it will additionally call NameOf

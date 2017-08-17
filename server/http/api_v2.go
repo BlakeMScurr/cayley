@@ -16,6 +16,7 @@ package cayleyhttp
 
 import (
 	"compress/gzip"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -25,7 +26,6 @@ import (
 	"time"
 
 	"github.com/julienschmidt/httprouter"
-	"golang.org/x/net/context"
 
 	"github.com/codelingo/cayley/clog"
 	"github.com/codelingo/cayley/graph"
@@ -195,6 +195,11 @@ func (api *APIv2) ServeWrite(w http.ResponseWriter, r *http.Request) {
 	qw := graph.NewWriter(h.QuadWriter)
 	defer qw.Close()
 	n, err := quad.CopyBatch(qw, qr, api.batch)
+	if err != nil {
+		jsonResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+	err = qw.Close()
 	if err != nil {
 		jsonResponse(w, http.StatusInternalServerError, err)
 		return

@@ -10,11 +10,11 @@ import (
 
 func TestCount(t *testing.T) {
 	fixed := NewFixed(Identity,
-		fetchedValue{Val: quad.String("a")},
-		fetchedValue{Val: quad.String("b")},
-		fetchedValue{Val: quad.String("c")},
-		fetchedValue{Val: quad.String("d")},
-		fetchedValue{Val: quad.String("e")},
+		graph.PreFetched(quad.String("a")),
+		graph.PreFetched(quad.String("b")),
+		graph.PreFetched(quad.String("c")),
+		graph.PreFetched(quad.String("d")),
+		graph.PreFetched(quad.String("e")),
 	)
 	it := NewCount(fixed, nil)
 	require.True(t, it.Next(nil))
@@ -26,8 +26,8 @@ func TestCount(t *testing.T) {
 	fixed.Reset()
 
 	fixed2 := NewFixed(Identity,
-		fetchedValue{Val: quad.String("b")},
-		fetchedValue{Val: quad.String("d")},
+		graph.PreFetched(quad.String("b")),
+		graph.PreFetched(quad.String("d")),
 	)
 	it = NewCount(NewAnd(nil, fixed, fixed2), nil)
 	require.True(t, it.Next(nil))
@@ -41,5 +41,5 @@ func TestCount(t *testing.T) {
 	require.True(t, it.Next(nil))
 	m := make(map[string]graph.Value)
 	it.TagResults(m)
-	require.Equal(t, map[string]graph.Value{"count": fetchedValue{Val: quad.Int(2)}}, m)
+	require.Equal(t, map[string]graph.Value{"count": graph.PreFetched(quad.Int(2))}, m)
 }

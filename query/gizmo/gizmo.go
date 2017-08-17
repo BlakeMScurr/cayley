@@ -15,11 +15,11 @@
 package gizmo
 
 import (
+	"context"
 	"fmt"
 	"sort"
 
 	"github.com/dop251/goja"
-	"golang.org/x/net/context"
 
 	"github.com/codelingo/cayley/clog"
 	"github.com/codelingo/cayley/graph"
@@ -227,7 +227,7 @@ func (r *Result) Err() error { return nil }
 
 func (s *Session) run(qu string) (v goja.Value, err error) {
 	var p *goja.Program
-	if s.last == qu {
+	if s.last == qu && s.last != "" {
 		p = s.p
 	} else {
 		p, err = goja.Compile("", qu, false)

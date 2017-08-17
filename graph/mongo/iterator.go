@@ -136,9 +136,9 @@ func (it *Iterator) Clone() graph.Iterator {
 
 func (it *Iterator) Next() bool {
 	var result struct {
-		ID      string  `bson:"_id"`
-		Added   []int64 `bson:"Added"`
-		Deleted []int64 `bson:"Deleted"`
+		ID      string     `bson:"_id"`
+		Added   []bson.Raw `bson:"Added"`
+		Deleted []bson.Raw `bson:"Deleted"`
 	}
 	if it.iter == nil {
 		it.iter = it.makeMongoIterator()
@@ -205,19 +205,11 @@ func (it *Iterator) Size() (int64, bool) {
 	return it.size, true
 }
 
-var mongoType graph.Type
-
-func init() {
-	mongoType = graph.RegisterIterator("mongo")
-}
-
-func Type() graph.Type { return mongoType }
-
 func (it *Iterator) Type() graph.Type {
 	if it.isAll {
 		return graph.All
 	}
-	return mongoType
+	return "mongo"
 }
 
 func (it *Iterator) Sorted() bool                     { return true }

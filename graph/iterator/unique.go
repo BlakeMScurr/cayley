@@ -72,10 +72,7 @@ func (it *Unique) Next(ctx *graph.IterationContext) bool {
 
 	for it.subIt.Next(ctx) {
 		curr := it.subIt.Result()
-		var key interface{} = curr
-		if v, ok := curr.(graph.Keyer); ok {
-			key = v.Key()
-		}
+		key := graph.ToKey(curr)
 		if ok := it.seen[key]; !ok {
 			it.result = curr
 			it.seen[key] = true

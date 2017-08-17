@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/codelingo/cayley/clog"
 	"github.com/codelingo/cayley/graph"
@@ -85,8 +84,6 @@ func runChanTxPostgres(tx *sql.Tx, tx2 *sql.Tx, in <-chan graph.Delta, opts grap
 
 	type quadValue struct {
 		hs, hp, ho, hl NodeHash
-		id             graph.PrimaryKey
-		timestamp      time.Time
 	}
 
 	quads := make(chan quadValue)
@@ -104,7 +101,7 @@ func runChanTxPostgres(tx *sql.Tx, tx2 *sql.Tx, in <-chan graph.Delta, opts grap
 			panic(err)
 		}
 
-		quadStmt, err := tx2.Prepare(pq.CopyIn("quads_copy", "subject_hash", "predicate_hash", "object_hash", "label_hash", "id", "ts"))
+		quadStmt, err := tx2.Prepare(pq.CopyIn("quads_copy", "subject_hash", "predicate_hash", "object_hash", "label_hash"))
 		if err != nil {
 			clog.Errorf("couldn't prepare COPY statement: %v", err)
 			panic(err)
@@ -116,8 +113,6 @@ func runChanTxPostgres(tx *sql.Tx, tx2 *sql.Tx, in <-chan graph.Delta, opts grap
 				quValue.hp.toSQL(),
 				quValue.ho.toSQL(),
 				quValue.hl.toSQL(),
-				quValue.id.Int(),
-				quValue.timestamp,
 			)
 			err = convInsertErrorPG(err)
 			if err != nil {
@@ -212,7 +207,7 @@ func runChanTxPostgres(tx *sql.Tx, tx2 *sql.Tx, in <-chan graph.Delta, opts grap
 
 				inserted[h] = struct{}{}
 			}
-			quads <- quadValue{hs, hp, ho, hl, d.ID, d.Timestamp}
+			quads <- quadValue{hs, hp, ho, hl}
 		}
 		close(quads)
 
@@ -279,7 +274,7 @@ func runTxPostgres(tx *sql.Tx, in []graph.Delta, opts graph.IgnoreOpts) error {
 		switch d.Action {
 		case graph.Add:
 			if insertQuad == nil {
-				insertQuad, err = tx.Prepare(`INSERT INTO quads(subject_hash, predicate_hash, object_hash, label_hash, id, ts) VALUES ($1, $2, $3, $4, $5, $6)` + end)
+				insertQuad, err = tx.Prepare(`INSERT INTO quads(subject_hash, predicate_hash, object_hash, label_hash, ts) VALUES ($1, $2, $3, $4, now())` + end)
 				if err != nil {
 					return err
 				}
@@ -338,14 +333,13 @@ func runTxPostgres(tx *sql.Tx, in []graph.Delta, opts graph.IgnoreOpts) error {
 			}
 			_, err := insertQuad.Exec(
 				hs.toSQL(), hp.toSQL(), ho.toSQL(), hl.toSQL(),
-				d.ID.Int(),
-				d.Timestamp,
 			)
 			err = convInsertErrorPG(err)
 			if err != nil {
 				clog.Errorf("couldn't exec INSERT statement: %v", err)
 				return err
 			}
+
 		case graph.Delete:
 			if deleteQuad == nil {
 				deleteQuad, err = tx.Prepare(`DELETE FROM quads WHERE subject_hash=$1 and predicate_hash=$2 and object_hash=$3 and label_hash=$4;`)

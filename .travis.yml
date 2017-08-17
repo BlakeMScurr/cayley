@@ -3,8 +3,8 @@ language: go
 sudo: false
 
 go:
-  - 1.6
   - 1.7
+  - 1.8
   - tip
 
 install:
@@ -15,15 +15,15 @@ install:
   - glide install
 
   # Google App Engine dependencies
-  - cd ..
-  - wget https://storage.googleapis.com/appengine-sdks/featured/go_appengine_sdk_linux_amd64-1.9.40.zip
-  - unzip -q go_appengine_sdk_linux_amd64-1.9.40.zip
-  - export PATH=$PATH:$PWD/go_appengine/
-  - cd cayley
+  #  - cd ..
+  #  - wget https://storage.googleapis.com/appengine-sdks/featured/go_appengine_sdk_linux_amd64-1.9.40.zip
+  #  - unzip -q go_appengine_sdk_linux_amd64-1.9.40.zip
+  #  - export PATH=$PATH:$PWD/go_appengine/
+  #  - cd cayley
 
 script:
   - go test -v $(go list ./... | grep -v vendor/)
-  - goapp test -v ./graph/gaedatastore
+  #  - goapp test -v ./graph/gaedatastore
 
 matrix:
   allow_failures:

@@ -17,11 +17,10 @@ package sexp
 // Defines a running session of the sexp query language.
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sort"
-
-	"golang.org/x/net/context"
 
 	"github.com/codelingo/cayley/graph"
 	"github.com/codelingo/cayley/query"

@@ -21,35 +21,30 @@ import (
 
 	"github.com/codelingo/cayley/graph"
 	"github.com/codelingo/cayley/graph/iterator"
-	"github.com/codelingo/cayley/graph/memstore/b"
 	"github.com/codelingo/cayley/quad"
 )
 
 type Iterator struct {
-	nodes  bool
-	uid    uint64
-	qs     *QuadStore
-	tags   graph.Tagger
-	tree   *b.Tree
-	iter   *b.Enumerator
-	result int64
-	err    error
+	nodes bool
+	uid   uint64
+	qs    *QuadStore
+	tags  graph.Tagger
+	tree  *Tree
+
+	iter *Enumerator
+	cur  *primitive
+	err  error
 
 	d     quad.Direction
-	value graph.Value
+	value int64
 }
 
-func NewIterator(tree *b.Tree, qs *QuadStore, d quad.Direction, value graph.Value) *Iterator {
-	iter, err := tree.SeekFirst()
-	if err != nil {
-		iter = nil
-	}
+func NewIterator(tree *Tree, qs *QuadStore, d quad.Direction, value int64) *Iterator {
 	return &Iterator{
 		nodes: d == 0,
 		uid:   iterator.NextUID(),
 		qs:    qs,
 		tree:  tree,
-		iter:  iter,
 		d:     d,
 		value: value,
 	}
@@ -60,11 +55,9 @@ func (it *Iterator) UID() uint64 {
 }
 
 func (it *Iterator) Reset() {
-	var err error
-	it.iter, err = it.tree.SeekFirst()
-	if err != nil {
-		it.iter = nil
-	}
+	it.iter = nil
+	it.err = nil
+	it.cur = nil
 }
 
 func (it *Iterator) Tagger() *graph.Tagger {
@@ -82,31 +75,8 @@ func (it *Iterator) TagResults(dst map[string]graph.Value) {
 }
 
 func (it *Iterator) Clone() graph.Iterator {
-	var iter *b.Enumerator
-	if it.result > 0 {
-		var ok bool
-		iter, ok = it.tree.Seek(it.result)
-		if !ok {
-			panic("value unexpectedly missing")
-		}
-	} else {
-		var err error
-		iter, err = it.tree.SeekFirst()
-		if err != nil {
-			iter = nil
-		}
-	}
-
-	m := &Iterator{
-		uid:   iterator.NextUID(),
-		qs:    it.qs,
-		tree:  it.tree,
-		iter:  iter,
-		d:     it.d,
-		value: it.value,
-	}
+	m := NewIterator(it.tree, it.qs, it.d, it.value)
 	m.tags.CopyFrom(it)
-
 	return m
 }
 
@@ -114,27 +84,26 @@ func (it *Iterator) Close() error {
 	return nil
 }
 
-func (it *Iterator) checkValid(index int64) bool {
-	return it.qs.log[index].DeletedBy == 0
-}
-
 func (it *Iterator) Next(ctx *graph.IterationContext) bool {
 	graph.NextLogIn(it)
 	if it.iter == nil {
-		return graph.NextLogOut(it, false)
+		it.iter, it.err = it.tree.SeekFirst()
+		if it.err == io.EOF || it.iter == nil {
+			it.err = nil
+			return graph.NextLogOut(it, false)
+		} else if it.err != nil {
+			return graph.NextLogOut(it, false)
+		}
 	}
 	for {
-		result, _, err := it.iter.Next()
+		_, p, err := it.iter.Next()
 		if err != nil {
 			if err != io.EOF {
 				it.err = err
 			}
 			return graph.NextLogOut(it, false)
 		}
-		if !it.checkValid(result) {
-			continue
-		}
-		it.result = result
+		it.cur = p
 		return graph.NextLogOut(it, true)
 	}
 }
@@ -144,10 +113,10 @@ func (it *Iterator) Err() error {
 }
 
 func (it *Iterator) Result() graph.Value {
-	if it.nodes {
-		return iterator.Int64Node(it.result)
+	if it.cur == nil {
+		return nil
 	}
-	return iterator.Int64Quad(it.result)
+	return qprim{p: it.cur}
 }
 
 func (it *Iterator) NextPath(ctx *graph.IterationContext) bool {
@@ -167,18 +136,18 @@ func (it *Iterator) Contains(ctx *graph.IterationContext, v graph.Value) bool {
 	graph.ContainsLogIn(it, v)
 	if v == nil {
 		return graph.ContainsLogOut(it, v, false)
-	} else if it.nodes != it.qs.isNode(v) {
-		return graph.ContainsLogOut(it, v, false)
 	}
-	var vi int64
-	if it.nodes {
-		vi = int64(v.(iterator.Int64Node))
-	} else {
-		vi = int64(v.(iterator.Int64Quad))
-	}
-	if _, ok := it.tree.Get(vi); ok {
-		it.result = vi
-		return graph.ContainsLogOut(it, v, true)
+	switch v := v.(type) {
+	case bnode:
+		if p, ok := it.tree.Get(int64(v)); ok {
+			it.cur = p
+			return graph.ContainsLogOut(it, v, true)
+		}
+	case qprim:
+		if v.p.Quad.Dir(it.d) == it.value {
+			it.cur = v.p
+			return graph.ContainsLogOut(it, v, true)
+		}
 	}
 	return graph.ContainsLogOut(it, v, false)
 }
@@ -194,15 +163,7 @@ func (it *Iterator) Describe() graph.Description {
 	}
 }
 
-var memType graph.Type
-
-func init() {
-	memType = graph.RegisterIterator("b+tree")
-}
-
-func Type() graph.Type { return memType }
-
-func (it *Iterator) Type() graph.Type { return memType }
+func (it *Iterator) Type() graph.Type { return "b+tree" }
 
 func (it *Iterator) Sorted() bool { return true }
 

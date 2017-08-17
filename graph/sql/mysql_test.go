@@ -54,7 +54,9 @@ func makeMysql(t testing.TB) (graph.QuadStore, graph.Options, func()) {
 }
 
 func TestMysqlAll(t *testing.T) {
+	t.Parallel()
 	graphtest.TestAll(t, makeMysql, &graphtest.Config{
+		NoPrimitives:            true,
 		TimeInMcs:               true,
 		OptimizesHasAToUnique:   true,
 		SkipNodeDelAfterQuadDel: true,
@@ -62,5 +64,6 @@ func TestMysqlAll(t *testing.T) {
 }
 
 func TestMysqlPaths(t *testing.T) {
+	t.Parallel()
 	pathtest.RunTestMorphisms(t, makeMysql)
 }

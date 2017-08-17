@@ -33,7 +33,6 @@ func TestCreateDatabase(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Could not create working directory: %v", err)
 	}
-	t.Log(tmpDir)
 
 	err = createNewLevelDB(tmpDir, nil)
 	if err != nil {
@@ -75,6 +74,7 @@ func makeLevelDB(t testing.TB) (graph.QuadStore, graph.Options, func()) {
 
 func TestLevelDBAll(t *testing.T) {
 	graphtest.TestAll(t, makeLevelDB, &graphtest.Config{
+		NoPrimitives:            true,
 		SkipDeletedFromIterator: true,
 		SkipNodeDelAfterQuadDel: true,
 	})
@@ -86,7 +86,6 @@ func TestLoadDatabase(t *testing.T) {
 		t.Fatalf("Could not create working directory: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
-	t.Log(tmpDir)
 
 	err = createNewLevelDB(tmpDir, nil)
 	if err != nil {
@@ -135,8 +134,8 @@ func TestLoadDatabase(t *testing.T) {
 
 	//Test horizon
 	horizon := qs.Horizon()
-	if horizon.Int() != 1 {
-		t.Errorf("Unexpected horizon value, got:%d expect:1", horizon.Int())
+	if v, _ := horizon.Int(); v != 1 {
+		t.Errorf("Unexpected horizon value, got:%d expect:1", v)
 	}
 
 	w.AddQuadSet(graphtest.MakeQuadSet())
@@ -147,8 +146,8 @@ func TestLoadDatabase(t *testing.T) {
 		t.Errorf("Unexpected quadstore size, got:%d expect:5", s)
 	}
 	horizon = qs.Horizon()
-	if horizon.Int() != 12 {
-		t.Errorf("Unexpected horizon value, got:%d expect:12", horizon.Int())
+	if v, _ := horizon.Int(); v != 12 {
+		t.Errorf("Unexpected horizon value, got:%d expect:12", v)
 	}
 
 	w.RemoveQuad(quad.MakeRaw(
@@ -184,8 +183,8 @@ func TestOptimize(t *testing.T) {
 	if !ok {
 		t.Errorf("Failed to optimize iterator")
 	}
-	if newIt.Type() != Type() {
-		t.Errorf("Optimized iterator type does not match original, got:%v expect:%v", newIt.Type(), Type())
+	if _, ok := newIt.(*Iterator); !ok {
+		t.Errorf("Optimized iterator type does not match original, got:%T", newIt)
 	}
 
 	newQuads := graphtest.IteratedQuads(t, qs, newIt)

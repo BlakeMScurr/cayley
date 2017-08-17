@@ -24,7 +24,6 @@ package graph
 import (
 	"errors"
 	"io"
-	"time"
 
 	"github.com/codelingo/cayley/quad"
 )
@@ -49,10 +48,8 @@ const (
 )
 
 type Delta struct {
-	ID        PrimaryKey
-	Quad      quad.Quad
-	Action    Procedure
-	Timestamp time.Time
+	Quad   quad.Quad
+	Action Procedure
 }
 
 type Handle struct {
@@ -143,7 +140,7 @@ type QuadWriter interface {
 	ApplyTransaction(*Transaction) error
 
 	// RemoveNode removes all quads which have the given node as subject, predicate, object, or label.
-	RemoveNode(Value) error
+	RemoveNode(quad.Value) error
 
 	// Close cleans up replication and closes the writing aspect of the database.
 	Close() error
@@ -179,19 +176,36 @@ func WriterMethods() []string {
 type BatchWriter interface {
 	quad.WriteCloser
 	quad.BatchWriter
+	Flush() error
 }
 
 // NewWriter creates a quad writer for a given QuadStore.
+//
+// Caller must call Flush or Close to flush an internal buffer.
 func NewWriter(qs QuadWriter) BatchWriter {
 	return &batchWriter{qs: qs}
 }
 
 type batchWriter struct {
-	qs QuadWriter
+	qs  QuadWriter
+	buf []quad.Quad
+}
+
+func (w *batchWriter) flushBuffer(force bool) error {
+	if !force && len(w.buf) < quad.DefaultBatch {
+		return nil
+	}
+	_, err := w.WriteQuads(w.buf)
+	w.buf = w.buf[:0]
+	return err
 }
 
 func (w *batchWriter) WriteQuad(q quad.Quad) error {
-	return w.qs.AddQuad(q)
+	if err := w.flushBuffer(false); err != nil {
+		return err
+	}
+	w.buf = append(w.buf, q)
+	return nil
 }
 func (w *batchWriter) WriteQuads(quads []quad.Quad) (int, error) {
 	if err := w.qs.AddQuadSet(quads); err != nil {
@@ -199,7 +213,38 @@ func (w *batchWriter) WriteQuads(quads []quad.Quad) (int, error) {
 	}
 	return len(quads), nil
 }
-func (w *batchWriter) Close() error { return nil }
+func (w *batchWriter) Flush() error {
+	return w.flushBuffer(true)
+}
+func (w *batchWriter) Close() error {
+	return w.Flush()
+}
+
+// NewTxWriter creates a writer that applies a given procedures for all quads in stream.
+// If procedure is zero, Add operation will be used.
+func NewTxWriter(tx *Transaction, p Procedure) quad.Writer {
+	if p == 0 {
+		p = Add
+	}
+	return &txWriter{tx: tx, p: p}
+}
+
+type txWriter struct {
+	tx *Transaction
+	p  Procedure
+}
+
+func (w *txWriter) WriteQuad(q quad.Quad) error {
+	switch w.p {
+	case Add:
+		w.tx.AddQuad(q)
+	case Delete:
+		w.tx.RemoveQuad(q)
+	default:
+		return ErrInvalidAction
+	}
+	return nil
+}
 
 // NewRemover creates a quad writer for a given QuadStore which removes quads instead of adding them.
 func NewRemover(qs QuadWriter) BatchWriter {
@@ -222,6 +267,9 @@ func (w *removeWriter) WriteQuads(quads []quad.Quad) (int, error) {
 		return 0, err
 	}
 	return len(quads), nil
+}
+func (w *removeWriter) Flush() error {
+	return nil // TODO: batch deletes automatically
 }
 func (w *removeWriter) Close() error { return nil }
 

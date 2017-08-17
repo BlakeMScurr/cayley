@@ -188,6 +188,23 @@ func (d Direction) String() string {
 	}
 }
 
+func (d Direction) GoString() string {
+	switch d {
+	case Any:
+		return "quad.Any"
+	case Subject:
+		return "quad.Subject"
+	case Predicate:
+		return "quad.Predicate"
+	case Label:
+		return "quad.Label"
+	case Object:
+		return "quad.Object"
+	default:
+		return fmt.Sprintf("%x", byte(d))
+	}
+}
+
 // Per-field accessor for quads.
 func (q Quad) Get(d Direction) Value {
 	switch d {
@@ -199,6 +216,21 @@ func (q Quad) Get(d Direction) Value {
 		return q.Label
 	case Object:
 		return q.Object
+	default:
+		panic(d.String())
+	}
+}
+
+func (q *Quad) Set(d Direction, v Value) {
+	switch d {
+	case Subject:
+		q.Subject = v
+	case Predicate:
+		q.Predicate = v
+	case Label:
+		q.Label = v
+	case Object:
+		q.Object = v
 	default:
 		panic(d.String())
 	}

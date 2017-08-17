@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/codelingo/cayley/clog"
 	"github.com/codelingo/cayley/graph"
@@ -152,6 +153,7 @@ func upgrade1To2(db *leveldb.DB) error {
 	{
 		fmt.Println("Upgrading bucket d")
 		it := db.NewIterator(&util.Range{Start: []byte{'d'}, Limit: []byte{'d' + 1}}, nil)
+		h := int64(0)
 		for it.Next() {
 			k, v := it.Key(), it.Value()
 			id, err := strconv.ParseInt(string(k[1:]), 16, 64)
@@ -163,7 +165,8 @@ func upgrade1To2(db *leveldb.DB) error {
 			if err := json.Unmarshal(v, &val); err != nil {
 				return err
 			}
-			p := deltaToProto(val)
+			h++
+			p := deltaToProto(val, h, time.Now())
 			nv, err := p.Marshal()
 			if err != nil {
 				return err

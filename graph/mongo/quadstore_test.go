@@ -40,7 +40,9 @@ func makeMongo(t testing.TB) (graph.QuadStore, graph.Options, func()) {
 }
 
 func TestMongoAll(t *testing.T) {
+	t.Parallel()
 	graphtest.TestAll(t, makeMongo, &graphtest.Config{
+		NoPrimitives:             true,
 		TimeInMs:                 true,
 		OptimizesComparison:      true,
 		SkipDeletedFromIterator:  true,
@@ -49,6 +51,7 @@ func TestMongoAll(t *testing.T) {
 }
 
 func TestMongoPaths(t *testing.T) {
+	t.Parallel()
 	pathtest.RunTestMorphisms(t, makeMongo)
 }
 
