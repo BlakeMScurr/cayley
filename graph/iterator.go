@@ -217,9 +217,10 @@ func DescribeIteratorTree(it Iterator, indentation string) {
 
 // IterationContext keeps state for a given iteration.  Currently it stores the values of variables.
 type IterationContext struct {
-	values  map[string]Value
-	isBound map[string]bool
-	subIts  map[string]Iterator
+	values     map[string]Value
+	isBound    map[string]bool
+	subIts     map[string]Iterator
+	tempValues map[string]Value
 }
 
 func NewIterationContext() *IterationContext {
@@ -240,8 +241,16 @@ func (c *IterationContext) BindVariable(qs QuadStore, varName string) bool {
 	return true
 }
 
+// Set the values of the variables to a given set
+func (c *IterationContext) SetValues(vals map[string]Value) {
+	c.tempValues = vals
+}
+
 // Values returns the current values of all the variables in this context
 func (c *IterationContext) Values() map[string]Value {
+	if c.tempValues != nil {
+		return c.tempValues
+	}
 	varNames := map[string]Value{}
 	for varName := range c.subIts {
 		varNames[varName] = c.CurrentValue(varName)
@@ -251,12 +260,16 @@ func (c *IterationContext) Values() map[string]Value {
 
 // CurrentValue gets the value of the variable of name varName
 func (c *IterationContext) CurrentValue(varName string) Value {
+	if c.tempValues != nil {
+		return c.tempValues[varName]
+	}
 	return c.subIts[varName].Result()
 }
 
 // Next calls next on the subiterator that provides the value source for the variable
 // of name varName
 func (c *IterationContext) Next(varName string) bool {
+	c.tempValues = nil
 	if c.subIts[varName].Next(c) {
 		c.values[varName] = c.subIts[varName].Result()
 		return true
