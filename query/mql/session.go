@@ -15,11 +15,10 @@
 package mql
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"sort"
-
-	"golang.org/x/net/context"
 
 	"github.com/codelingo/cayley/graph"
 	"github.com/codelingo/cayley/graph/iterator"

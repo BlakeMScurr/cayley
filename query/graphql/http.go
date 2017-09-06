@@ -1,11 +1,11 @@
 package graphql
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 
 	"github.com/dennwc/graphql/gqlerrors"
-	"golang.org/x/net/context"
 
 	"github.com/codelingo/cayley/graph"
 	"github.com/codelingo/cayley/query"

@@ -39,9 +39,13 @@ type Int64 struct {
 
 type Int64Node int64
 
+func (v Int64Node) Key() interface{} { return v }
+
 func (Int64Node) IsNode() bool { return true }
 
 type Int64Quad int64
+
+func (v Int64Quad) Key() interface{} { return v }
 
 func (Int64Quad) IsNode() bool { return false }
 

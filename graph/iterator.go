@@ -19,7 +19,6 @@ package graph
 import (
 	"fmt"
 	"strings"
-	"sync"
 
 	"github.com/codelingo/cayley/clog"
 	"github.com/codelingo/cayley/quad"
@@ -45,8 +44,8 @@ type Linkage struct {
 // TODO(barakmich): Helper functions as needed, eg, ValuesForDirection(quad.Direction) []Value
 
 // Add a tag to the iterator.
-func (t *Tagger) Add(tag string) {
-	t.tags = append(t.tags, tag)
+func (t *Tagger) Add(tag ...string) {
+	t.tags = append(t.tags, tag...)
 }
 
 func (t *Tagger) AddFixed(tag string, value Value) {
@@ -218,9 +217,10 @@ func DescribeIteratorTree(it Iterator, indentation string) {
 
 // IterationContext keeps state for a given iteration.  Currently it stores the values of variables.
 type IterationContext struct {
-	values  map[string]Value
-	isBound map[string]bool
-	subIts  map[string]Iterator
+	values     map[string]Value
+	isBound    map[string]bool
+	subIts     map[string]Iterator
+	tempValues map[string]Value
 }
 
 func NewIterationContext() *IterationContext {
@@ -241,8 +241,16 @@ func (c *IterationContext) BindVariable(qs QuadStore, varName string) bool {
 	return true
 }
 
+// Set the values of the variables to a given set
+func (c *IterationContext) SetValues(vals map[string]Value) {
+	c.tempValues = vals
+}
+
 // Values returns the current values of all the variables in this context
 func (c *IterationContext) Values() map[string]Value {
+	if c.tempValues != nil {
+		return c.tempValues
+	}
 	varNames := map[string]Value{}
 	for varName := range c.subIts {
 		varNames[varName] = c.CurrentValue(varName)
@@ -252,12 +260,16 @@ func (c *IterationContext) Values() map[string]Value {
 
 // CurrentValue gets the value of the variable of name varName
 func (c *IterationContext) CurrentValue(varName string) Value {
+	if c.tempValues != nil {
+		return c.tempValues[varName]
+	}
 	return c.subIts[varName].Result()
 }
 
 // Next calls next on the subiterator that provides the value source for the variable
 // of name varName
 func (c *IterationContext) Next(varName string) bool {
+	c.tempValues = nil
 	if c.subIts[varName].Next(c) {
 		c.values[varName] = c.subIts[varName].Result()
 		return true
@@ -283,102 +295,37 @@ type IteratorStats struct {
 }
 
 // Type enumerates the set of Iterator types.
-type Type int
+type Type string
 
 // These are the iterator types, defined as constants
 const (
-	Invalid Type = iota
-	All
-	And
-	Or
-	HasA
-	LinksTo
-	Comparison
-	Null
-	Fixed
-	Variable
-	Not
-	Optional
-	Materialize
-	Unique
-	Limit
-	Skip
-	Regex
-	Recursive
-	Count
+	Invalid     = Type("")
+	All         = Type("all")
+	And         = Type("and")
+	Or          = Type("or")
+	HasA        = Type("hasa")
+	LinksTo     = Type("linksto")
+	Comparison  = Type("comparison")
+	Null        = Type("null")
+	Fixed       = Type("fixed")
+	Not         = Type("not")
+	Optional    = Type("optional")
+	Materialize = Type("materialize")
+	Unique      = Type("unique")
+	Limit       = Type("limit")
+	Skip        = Type("skip")
+	Regex       = Type("regexp")
+	Count       = Type("count")
+	Recursive   = Type("recursive")
+	Variable    = Type("variable")
 )
-
-var (
-	// We use a sync.Mutex rather than an RWMutex since the client packages keep
-	// the Type that was returned, so the only possibility for contention is at
-	// initialization.
-	lock sync.Mutex
-	// These strings must be kept in order consistent with the Type const block above.
-	types = []string{
-		"invalid",
-		"all",
-		"and",
-		"or",
-		"hasa",
-		"linksto",
-		"comparison",
-		"null",
-		"fixed",
-		"variable",
-		"not",
-		"optional",
-		"materialize",
-		"unique",
-		"limit",
-		"skip",
-		"regex",
-		"recursive",
-		"count",
-		"recursive",
-	}
-)
-
-// RegisterIterator adds a new iterator type to the set of acceptable types, returning
-// the registered Type.
-// Calls to Register are idempotent and must be made prior to use of the iterator.
-// The conventional approach for use is to include a call to Register in a package
-// init() function, saving the Type to a private package var.
-func RegisterIterator(name string) Type {
-	lock.Lock()
-	defer lock.Unlock()
-	for i, t := range types {
-		if t == name {
-			return Type(i)
-		}
-	}
-	types = append(types, name)
-	return Type(len(types) - 1)
-}
 
 // String returns a string representation of the Type.
 func (t Type) String() string {
-	if t < 0 || int(t) >= len(types) {
+	if t == "" {
 		return "illegal-type"
 	}
-	return types[t]
-}
-
-func (t *Type) MarshalText() (text []byte, err error) {
-	if *t < 0 || int(*t) >= len(types) {
-		return nil, fmt.Errorf("graph: illegal iterator type: %d", *t)
-	}
-	return []byte(types[*t]), nil
-}
-
-func (t *Type) UnmarshalText(text []byte) error {
-	s := string(text)
-	for i, c := range types[1:] {
-		if c == s {
-			*t = Type(i + 1)
-			return nil
-		}
-	}
-	return fmt.Errorf("graph: unknown iterator label: %q", text)
+	return string(t)
 }
 
 type StatsContainer struct {

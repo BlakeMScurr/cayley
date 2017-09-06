@@ -15,12 +15,12 @@
 package pathtest
 
 import (
+	"context"
 	"reflect"
 	"regexp"
 	"sort"
 	"testing"
-
-	"golang.org/x/net/context"
+	"time"
 
 	. "github.com/codelingo/cayley/graph/path"
 
@@ -280,6 +280,11 @@ func testSet(qs graph.QuadStore) []test {
 			expect:  []quad.Value{vDani},
 		},
 		{
+			message: "Labels()",
+			path:    StartPath(qs, vGreg).Labels(),
+			expect:  []quad.Value{vSmartGraph},
+		},
+		{
 			message: "InPredicates()",
 			path:    StartPath(qs, vBob).InPredicates(),
 			expect:  []quad.Value{vFollows},
@@ -356,7 +361,7 @@ func testSet(qs graph.QuadStore) []test {
 	}
 }
 
-func RunTestMorphisms(t testing.TB, fnc graphtest.DatabaseFunc) {
+func RunTestMorphisms(t *testing.T, fnc graphtest.DatabaseFunc) {
 	for _, ftest := range []func(testing.TB, graphtest.DatabaseFunc){
 		testFollowRecursive,
 	} {
@@ -366,33 +371,39 @@ func RunTestMorphisms(t testing.TB, fnc graphtest.DatabaseFunc) {
 	defer closer()
 
 	for _, test := range testSet(qs) {
-		var (
-			got []quad.Value
-			err error
-		)
 		for _, opt := range []bool{true, false} {
-			if test.tag == "" {
-				got, err = runTopLevel(qs, test.path, opt)
-			} else {
-				got, err = runTag(qs, test.path, test.tag, opt)
-			}
-			unopt := ""
+			name := test.message
 			if !opt {
-				unopt = " (unoptimized)"
+				name += " (unoptimized)"
 			}
-			if err != nil {
-				t.Errorf("Failed to %s%s: %v", test.message, unopt, err)
-				continue
-			}
-			sort.Sort(quad.ByValueString(got))
-			sort.Sort(quad.ByValueString(test.expect))
-			eq := reflect.DeepEqual(got, test.expect)
-			if !eq && test.expectAlt != nil {
-				eq = reflect.DeepEqual(got, test.expectAlt)
-			}
-			if !eq {
-				t.Errorf("Failed to %s%s, got: %v(%d) expected: %v(%d)", test.message, unopt, got, len(got), test.expect, len(test.expect))
-			}
+			t.Run(name, func(t *testing.T) {
+				var (
+					got []quad.Value
+					err error
+				)
+				start := time.Now()
+				if test.tag == "" {
+					got, err = runTopLevel(qs, test.path, opt)
+				} else {
+					got, err = runTag(qs, test.path, test.tag, opt)
+				}
+				dt := time.Since(start)
+				if err != nil {
+					t.Error(err)
+					return
+				}
+				sort.Sort(quad.ByValueString(got))
+				sort.Sort(quad.ByValueString(test.expect))
+				eq := reflect.DeepEqual(got, test.expect)
+				if !eq && test.expectAlt != nil {
+					eq = reflect.DeepEqual(got, test.expectAlt)
+				}
+				if !eq {
+					t.Errorf("got: %v(%d) expected: %v(%d)", got, len(got), test.expect, len(test.expect))
+				} else {
+					t.Logf("%v", dt)
+				}
+			})
 		}
 	}
 }

@@ -34,7 +34,9 @@ import (
 	"github.com/codelingo/cayley/version"
 
 	// Load supported backends
+
 	_ "github.com/codelingo/cayley/graph/bolt"
+	_ "github.com/codelingo/cayley/graph/bolt2"
 	_ "github.com/codelingo/cayley/graph/leveldb"
 	_ "github.com/codelingo/cayley/graph/memstore"
 	_ "github.com/codelingo/cayley/graph/mongo"
@@ -125,6 +127,7 @@ func init() {
 		command.NewDumpDatabaseCmd(),
 		command.NewUpgradeCmd(),
 		command.NewReplCmd(),
+		command.NewQueryCmd(),
 		command.NewHttpCmd(),
 		command.NewConvertCmd(),
 		command.NewDedupCommand(),
@@ -138,6 +141,9 @@ func init() {
 	rootCmd.PersistentFlags().Bool("dup", true, "don't stop loading on duplicated on add")
 	rootCmd.PersistentFlags().Bool("missing", false, "don't stop loading on missing key on delete")
 	rootCmd.PersistentFlags().Int("batch", quad.DefaultBatch, "size of quads batch to load at once")
+
+	rootCmd.PersistentFlags().String("memprofile", "", "path to output memory profile")
+	rootCmd.PersistentFlags().String("cpuprofile", "", "path to output cpu profile")
 
 	// bind flags to config variables
 	viper.BindPFlag(command.KeyBackend, rootCmd.PersistentFlags().Lookup("db"))
@@ -170,6 +176,7 @@ func init() {
 			case "alsologtostderr": // glog.alsologtostderr
 				rf.Var(pFlag{f.Value}, f.Name, f.Usage)
 			case "logtostderr": // glog.logtostderr
+				f.Value.Set("true")
 				rf.Var(pFlag{f.Value}, f.Name, f.Usage)
 			case "log_dir": // glog.log_dir
 				rf.Var(pFlag{f.Value}, "logs", f.Usage)

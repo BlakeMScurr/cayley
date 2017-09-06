@@ -15,15 +15,16 @@
 package path
 
 import (
+	"context"
 	"regexp"
 
 	"github.com/codelingo/cayley/graph"
 	"github.com/codelingo/cayley/graph/iterator"
+	"github.com/codelingo/cayley/graph/shape"
 	"github.com/codelingo/cayley/quad"
-	"golang.org/x/net/context"
 )
 
-type applyMorphism func(graph.QuadStore, graph.Iterator, *pathContext) (graph.Iterator, *pathContext)
+type applyMorphism func(shape.Shape, *pathContext) (shape.Shape, *pathContext)
 
 type morphism struct {
 	Name     string
@@ -56,7 +57,7 @@ type pathContext struct {
 	// A nil in this field represents all labels.
 	//
 	// Claimed by the withLabel morphism
-	labelSet *Path
+	labelSet shape.Shape
 }
 
 func (c pathContext) copy() pathContext {
@@ -269,6 +270,14 @@ func (p *Path) BothWithTags(tags []string, via ...interface{}) *Path {
 	return np
 }
 
+// Labels updates this path to represent the nodes of the labels
+// of inbound and outbound quads.
+func (p *Path) Labels() *Path {
+	np := p.clone()
+	np.stack = append(np.stack, labelsMorphism())
+	return np
+}
+
 // InPredicates updates this path to represent the nodes of the valid inbound
 // predicates from the current nodes.
 //
@@ -372,8 +381,9 @@ func (p *Path) FollowRecursive(via interface{}, depthTags []string, max int) *Pa
 	default:
 		panic("did not pass a string predicate or a Path to FollowRecursive")
 	}
-	p.stack = append(p.stack, followRecursiveMorphism(path, depthTags, max))
-	return p
+	np := p.clone()
+	np.stack = append(np.stack, followRecursiveMorphism(path, depthTags, max))
+	return np
 }
 
 // Save will, from the current nodes in the path, retrieve the node
@@ -417,20 +427,6 @@ func (p *Path) Has(via interface{}, nodes ...quad.Value) *Path {
 	np := p.clone()
 	np.stack = append(np.stack, hasMorphism(via, nodes...))
 	return np
-}
-
-// HasRegex limits the paths to be ones where the current nodes have some linkage
-// to a node satisfying a regular expression.
-func (p *Path) HasRegex(via interface{}, pattern string) *Path {
-	p.stack = append(p.stack, hasRegexMorphism(via, pattern))
-	return p
-}
-
-// HasComparison limits the paths to be ones where the current nodes have some linkage
-// to a node satisfying a numeric comparison.
-func (p *Path) HasComparison(via interface{}, operator string, number float64) *Path {
-	p.stack = append(p.stack, hasComparisonMorphism(via, operator, number))
-	return p
 }
 
 // HasReverse limits the paths to be ones where some known node have some linkage
@@ -499,7 +495,7 @@ func (p *Path) BuildIterator() graph.Iterator {
 
 // BuildIteratorOn will return an iterator for this path on the given QuadStore.
 func (p *Path) BuildIteratorOn(qs graph.QuadStore) graph.Iterator {
-	return p.Morphism()(qs, qs.NodesAllIterator())
+	return shape.BuildIterator(qs, p.Shape())
 }
 
 // Morphism returns the morphism of this path.  The returned value is a
@@ -508,12 +504,7 @@ func (p *Path) BuildIteratorOn(qs graph.QuadStore) graph.Iterator {
 // iterator matched by the current Path.
 func (p *Path) Morphism() graph.ApplyMorphism {
 	return func(qs graph.QuadStore, it graph.Iterator) graph.Iterator {
-		i := it.Clone()
-		ctx := &p.baseContext
-		for _, m := range p.stack {
-			i, ctx = m.Apply(qs, i, ctx)
-		}
-		return i
+		return p.ShapeFrom(iteratorShape{it}).BuildIterator(qs)
 	}
 }
 
@@ -537,5 +528,16 @@ func (p *Path) Count() *Path {
 
 // Iterate is an shortcut for graph.Iterate.
 func (p *Path) Iterate(ctx context.Context) *graph.IterateChain {
-	return graph.Iterate(ctx, p.BuildIterator()).On(p.qs)
+	return shape.Iterate(ctx, p.qs, p.Shape())
+}
+func (p *Path) Shape() shape.Shape {
+	return p.ShapeFrom(shape.AllNodes{})
+}
+func (p *Path) ShapeFrom(from shape.Shape) shape.Shape {
+	var s shape.Shape = from
+	ctx := &p.baseContext
+	for _, m := range p.stack {
+		s, ctx = m.Apply(s, ctx)
+	}
+	return s
 }

@@ -19,18 +19,31 @@ type Recursive struct {
 
 	qs            graph.QuadStore
 	morphism      graph.ApplyMorphism
-	seen          map[graph.Value]seenAt
-	nextIt        graph.Iterator
+	seen          map[interface{}]seenAt
+	currentIt     int
+	nextIts       []itGivenVariables
 	depth         int
-	pathMap       map[graph.Value][]map[string]graph.Value
+	pathMap       map[interface{}][]map[string]graph.Value
 	pathIndex     int
 	containsValue graph.Value
 	depthTags     graph.Tagger
-	depthCache    []graph.Value
-	baseIt        graph.FixedIterator
-	vars          map[string]graph.Value
-	minDepth      int
-	maxDepth      int
+	// Stores values at the current depth with the values of variables when
+	// the value was found.
+	depthCache []*valuesGivenVariables
+	baseIt     graph.FixedIterator
+	vars       map[string]graph.Value
+	minDepth   int
+	maxDepth   int
+}
+
+type itGivenVariables struct {
+	varVals map[string]graph.Value
+	it      graph.Iterator
+}
+
+type valuesGivenVariables struct {
+	vars map[string]graph.Value
+	vals []graph.Value
 }
 
 type seenAt struct {
@@ -47,12 +60,18 @@ func NewRecursive(qs graph.QuadStore, it graph.Iterator, morphism graph.ApplyMor
 		uid:   NextUID(),
 		subIt: it,
 
-		qs:            qs,
-		morphism:      morphism,
-		seen:          make(map[graph.Value]seenAt),
-		nextIt:        &Null{},
+		qs:       qs,
+		morphism: morphism,
+		seen:     make(map[interface{}]seenAt),
+		nextIts: []itGivenVariables{
+			itGivenVariables{
+				it:      &Null{},
+				varVals: map[string]graph.Value{},
+			},
+		},
+		depthCache:    []*valuesGivenVariables{},
 		baseIt:        qs.FixedIterator(),
-		pathMap:       make(map[graph.Value][]map[string]graph.Value),
+		pathMap:       make(map[interface{}][]map[string]graph.Value),
 		containsValue: nil,
 		maxDepth:      max,
 	}
@@ -67,11 +86,17 @@ func (it *Recursive) Reset() {
 	it.result.depth = 0
 	it.err = nil
 	it.subIt.Reset()
-	it.seen = make(map[graph.Value]seenAt)
-	it.pathMap = make(map[graph.Value][]map[string]graph.Value)
+	it.seen = make(map[interface{}]seenAt)
+	it.pathMap = make(map[interface{}][]map[string]graph.Value)
 	it.containsValue = nil
 	it.pathIndex = 0
-	it.nextIt = &Null{}
+	it.nextIts = []itGivenVariables{
+		itGivenVariables{
+			it:      &Null{},
+			varVals: map[string]graph.Value{},
+		},
+	}
+
 	it.baseIt = it.qs.FixedIterator()
 	it.depth = 0
 }
@@ -101,12 +126,20 @@ func (it *Recursive) TagResults(dst map[string]graph.Value) {
 		dst[tag] = value
 	}
 	if it.containsValue != nil {
-		m := it.pathMap[graph.ToKey(it.containsValue)][it.pathIndex]
-		for k, v := range m {
-			dst[k] = v
+		paths := it.pathMap[graph.ToKey(it.containsValue)]
+		if len(paths) != 0 {
+			for k, v := range paths[it.pathIndex] {
+				dst[k] = v
+			}
 		}
 	}
 
+	if len(it.nextIts) != 0 {
+		for _, internalIt := range it.nextIts {
+			internalIt.it.TagResults(dst)
+		}
+	}
+	delete(dst, "__base_recursive")
 }
 
 func (it *Recursive) Clone() graph.Iterator {
@@ -123,9 +156,24 @@ func (it *Recursive) SubIterators() []graph.Iterator {
 func (it *Recursive) Next(ctx *graph.IterationContext) bool {
 	it.pathIndex = 0
 	if it.depth == 0 {
+		it.depthCache = append(it.depthCache, &valuesGivenVariables{
+			vars: ctx.Values(),
+		})
 		for it.subIt.Next(ctx) {
 			res := it.subIt.Result()
-			it.depthCache = append(it.depthCache, it.subIt.Result())
+			variableValues := ctx.Values()
+			if it.VarsUpdated(ctx) {
+				last := len(it.depthCache) - 1
+				if len(it.depthCache[last].vals) == 0 {
+					it.depthCache = it.depthCache[:last]
+				}
+				it.depthCache = append(it.depthCache, &valuesGivenVariables{
+					vars: variableValues,
+				})
+			}
+
+			last := len(it.depthCache) - 1
+			it.depthCache[last].vals = append(it.depthCache[last].vals, it.subIt.Result())
 			tags := make(map[string]graph.Value)
 			it.subIt.TagResults(tags)
 			key := graph.ToKey(res)
@@ -137,30 +185,61 @@ func (it *Recursive) Next(ctx *graph.IterationContext) bool {
 			}
 		}
 	}
-	for {
 
-		ok := it.nextIt.Next(ctx)
+	for {
+		ok := it.nextIts[it.currentIt].it.Next(ctx)
 		if !ok {
-			if len(it.depthCache) == 0 {
-				return graph.NextLogOut(it, false)
+			if it.currentIt < len(it.nextIts)-1 {
+				it.currentIt++
+				continue
 			}
+
 			it.depth++
 			if it.depth > it.maxDepth {
 				return graph.NextLogOut(it, false)
 			}
-			it.baseIt = it.qs.FixedIterator()
-			for _, x := range it.depthCache {
-				it.baseIt.Add(x)
+
+			if len(it.depthCache) == 0 {
+				return graph.NextLogOut(it, false)
 			}
-			it.baseIt.Tagger().Add("__base_recursive")
-			it.depthCache = nil
-			it.nextIt = it.morphism(it.qs, it.baseIt)
+
+			newDepthCache := []*valuesGivenVariables{}
+			it.nextIts = []itGivenVariables{}
+			for _, cacheSlot := range it.depthCache {
+				if len(cacheSlot.vals) == 0 {
+					continue
+				}
+
+				it.baseIt = it.qs.FixedIterator()
+				for _, x := range cacheSlot.vals {
+					it.baseIt.Add(x)
+				}
+
+				it.baseIt.Tagger().Add("__base_recursive")
+				it.nextIts = append(it.nextIts, itGivenVariables{
+					it:      it.morphism(it.qs, it.baseIt),
+					varVals: cacheSlot.vars,
+				})
+
+				newDepthCache = append(newDepthCache, &valuesGivenVariables{
+					vars: cacheSlot.vars,
+				})
+			}
+
+			if len(it.nextIts) == 0 {
+				it.nextIts = append(it.nextIts, itGivenVariables{
+					it: &Null{},
+				})
+			}
+
+			it.currentIt = 0
+			it.depthCache = newDepthCache
 			continue
 		}
 
-		val := it.nextIt.Result()
+		val := it.nextIts[it.currentIt].it.Result()
 		results := make(map[string]graph.Value)
-		it.nextIt.TagResults(results)
+		it.nextIts[it.currentIt].it.TagResults(results)
 		key := graph.ToKey(val)
 		if _, ok := it.seen[key]; ok {
 			continue
@@ -172,10 +251,12 @@ func (it *Recursive) Next(ctx *graph.IterationContext) bool {
 		it.result.depth = it.depth
 		it.result.val = val
 		it.containsValue = it.getBaseValue(val)
-		it.depthCache = append(it.depthCache, val)
+		it.depthCache[it.currentIt].vals = append(it.depthCache[it.currentIt].vals, val)
 
 		break
 	}
+	ctx.SetValues(it.nextIts[it.currentIt].varVals)
+
 	return graph.NextLogOut(it, true)
 }
 
@@ -202,21 +283,24 @@ func (it *Recursive) getBaseValue(val graph.Value) graph.Value {
 	return at.val
 }
 
-func (it *Recursive) ResetIfVarsUpdated(ctx *graph.IterationContext) {
+func (it *Recursive) VarsUpdated(ctx *graph.IterationContext) bool {
 	if ctx != nil {
 		newVars := ctx.Values()
 		// Using reflect is not ideal, and we should also not be throwing all this
 		// information away, it could be useful if we have the same var value at a
 		// later point.
 		if !reflect.DeepEqual(newVars, it.vars) {
-			it.Reset()
 			it.vars = newVars
+			return true
 		}
 	}
+	return false
 }
 
 func (it *Recursive) Contains(ctx *graph.IterationContext, val graph.Value) bool {
-	it.ResetIfVarsUpdated(ctx)
+	if it.VarsUpdated(ctx) {
+		it.Reset()
+	}
 
 	graph.ContainsLogIn(it, val)
 	it.pathIndex = 0
@@ -237,7 +321,7 @@ func (it *Recursive) Contains(ctx *graph.IterationContext, val graph.Value) bool
 }
 
 func (it *Recursive) NextPath(ctx *graph.IterationContext) bool {
-	if len(it.pathMap[graph.ToKey(it.containsValue)]) <= it.pathIndex+1 {
+	if it.pathIndex+1 >= len(it.pathMap[graph.ToKey(it.containsValue)]) {
 		return false
 	}
 	it.pathIndex++
@@ -249,9 +333,11 @@ func (it *Recursive) Close() error {
 	if err != nil {
 		return err
 	}
-	err = it.nextIt.Close()
-	if err != nil {
-		return err
+	for _, nextIt := range it.nextIts {
+		err = nextIt.it.Close()
+		if err != nil {
+			return err
+		}
 	}
 	it.seen = nil
 	return it.err

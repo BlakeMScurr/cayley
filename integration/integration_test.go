@@ -15,6 +15,7 @@
 package integration
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"io"
@@ -24,8 +25,6 @@ import (
 	"sync"
 	"testing"
 	"time"
-
-	"golang.org/x/net/context"
 
 	"github.com/codelingo/cayley/graph"
 	"github.com/codelingo/cayley/internal"
@@ -37,6 +36,7 @@ import (
 
 	// Load all supported backends.
 	_ "github.com/codelingo/cayley/graph/bolt"
+	_ "github.com/codelingo/cayley/graph/bolt2"
 	_ "github.com/codelingo/cayley/graph/leveldb"
 	_ "github.com/codelingo/cayley/graph/memstore"
 	_ "github.com/codelingo/cayley/graph/mongo"
@@ -452,7 +452,7 @@ func prepare(t testing.TB) {
 	switch *backend {
 	case "memstore":
 		cfg.DatabasePath = "../data/30kmoviedata.nq.gz"
-	case "leveldb", "bolt":
+	case "leveldb", "bolt", "bolt2":
 		cfg.DatabasePath = "/tmp/cayley_test_" + *backend
 		cfg.DatabaseOptions = map[string]interface{}{
 			"nosync": true, // It's a test. If we need to load, do it fast.
@@ -495,7 +495,7 @@ func prepare(t testing.TB) {
 			t.Fatalf("Failed to open %q: %v", cfg.DatabasePath, err)
 		}
 
-		if needsLoad && !remote {
+		if needsLoad {
 			err = internal.Load(handle.QuadWriter, cfg.LoadSize, "../data/30kmoviedata.nq.gz", format)
 			if err != nil {
 				t.Fatalf("Failed to load %q: %v", cfg.DatabasePath, err)
@@ -560,15 +560,14 @@ func checkQueries(t *testing.T) {
 		t.Fatal("not initialized")
 	}
 	for _, test := range benchmarkQueries {
-		if testing.Short() && test.long {
-			continue
-		}
-		if test.skip {
-			continue
-		}
-		func() {
+		t.Run(test.message, func(t *testing.T) {
+			if testing.Short() && test.long {
+				t.SkipNow()
+			}
+			if test.skip {
+				t.SkipNow()
+			}
 			tInit := time.Now()
-			t.Logf("Now testing %s ", test.message)
 			ses := gizmo.NewSession(handle.QuadStore)
 			c := make(chan query.Result, 5)
 			ctx := context.Background()
@@ -591,7 +590,7 @@ func checkQueries(t *testing.T) {
 				}
 				got = append(got, j.([]interface{})...)
 			}
-			t.Logf("(%v)\n", time.Since(tInit))
+			t.Log(time.Since(tInit))
 
 			if len(got) != len(test.expect) {
 				t.Errorf("Unexpected number of results, got:%d expect:%d on %s.", len(got), len(test.expect), test.message)
@@ -604,7 +603,7 @@ func checkQueries(t *testing.T) {
 			for i := range got {
 				t.Errorf("\n\tgot:%#v\n\texpect:%#v\n", got[i], test.expect[i])
 			}
-		}()
+		})
 	}
 }
 

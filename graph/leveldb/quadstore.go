@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"time"
 
 	"github.com/codelingo/cayley/clog"
 	"github.com/syndtr/goleveldb/leveldb"
@@ -33,10 +34,10 @@ import (
 
 func init() {
 	graph.RegisterQuadStore(QuadStoreType, graph.QuadStoreRegistration{
-		NewFunc:           newQuadStore,
-		UpgradeFunc:       upgradeLevelDB,
-		InitFunc:          createNewLevelDB,
-		IsPersistent:      true,
+		NewFunc:      newQuadStore,
+		UpgradeFunc:  upgradeLevelDB,
+		InitFunc:     createNewLevelDB,
+		IsPersistent: true,
 	})
 }
 
@@ -50,8 +51,6 @@ const (
 )
 
 var order = binary.LittleEndian
-
-var _ graph.Keyer = (Token)(nil)
 
 type Token []byte
 
@@ -241,11 +240,11 @@ var (
 	cps = [4]quad.Direction{quad.Label, quad.Predicate, quad.Subject, quad.Object}
 )
 
-func deltaToProto(delta graph.Delta) proto.LogDelta {
+func deltaToProto(delta graph.Delta, id int64, t time.Time) proto.LogDelta {
 	var newd proto.LogDelta
-	newd.ID = uint64(delta.ID.Int())
+	newd.ID = uint64(id)
 	newd.Action = int32(delta.Action)
-	newd.Timestamp = delta.Timestamp.UnixNano()
+	newd.Timestamp = t.UnixNano()
 	newd.Quad = pquads.MakeQuad(delta.Quad)
 	return newd
 }
@@ -254,17 +253,19 @@ func (qs *QuadStore) ApplyDeltas(deltas []graph.Delta, ignoreOpts graph.IgnoreOp
 	batch := &leveldb.Batch{}
 	resizeMap := make(map[quad.Value]int64)
 	sizeChange := int64(0)
+	h, t := qs.horizon, time.Now()
 	for _, d := range deltas {
 		if d.Action != graph.Add && d.Action != graph.Delete {
 			return &graph.DeltaError{Delta: d, Err: graph.ErrInvalidAction}
 		}
-		p := deltaToProto(d)
+		h++
+		p := deltaToProto(d, h, t)
 		bytes, err := p.Marshal()
 		if err != nil {
 			return &graph.DeltaError{Delta: d, Err: err}
 		}
-		batch.Put(createDeltaKeyFor(d.ID.Int()), bytes)
-		err = qs.buildQuadWrite(batch, d.Quad, d.ID.Int(), d.Action == graph.Add)
+		batch.Put(createDeltaKeyFor(h), bytes)
+		err = qs.buildQuadWrite(batch, d.Quad, h, d.Action == graph.Add)
 		if err != nil {
 			if err == graph.ErrQuadExists && ignoreOpts.IgnoreDup {
 				continue
@@ -285,7 +286,7 @@ func (qs *QuadStore) ApplyDeltas(deltas []graph.Delta, ignoreOpts graph.IgnoreOp
 			resizeMap[d.Quad.Label] += delta
 		}
 		sizeChange += delta
-		qs.horizon = d.ID.Int()
+		qs.horizon = h
 	}
 	for k, v := range resizeMap {
 		if v != 0 {
