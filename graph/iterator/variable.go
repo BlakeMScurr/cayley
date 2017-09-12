@@ -31,20 +31,29 @@ package iterator
 // The result of Contains() on a user depends on the state of the iteration context, so variables
 // cannot be used with iterators that cache contains results like the Materialize iterator.
 import (
+	"fmt"
 	"sort"
 
 	"github.com/codelingo/cayley/graph"
 )
 
+type varItType string
+
+const (
+	undetermined = varItType("Undetermined")
+	user         = varItType("User")
+	binder       = varItType("Binder")
+)
+
 // A Variable iterator consists of a name and an indication of whether it is a binder or a user.
 // The other state necessary for iteration is handled by the iteration context.
 type Variable struct {
-	uid      uint64
-	tags     graph.Tagger
-	varName  string
-	result   graph.Value
-	isBinder bool
-	qs       graph.QuadStore
+	uid     uint64
+	tags    graph.Tagger
+	varName string
+	result  graph.Value
+	itType  varItType
+	qs      graph.QuadStore
 }
 
 func NewVariable(qs graph.QuadStore, name string) *Variable {
@@ -52,6 +61,7 @@ func NewVariable(qs graph.QuadStore, name string) *Variable {
 		uid:     NextUID(),
 		varName: name,
 		qs:      qs,
+		itType:  undetermined,
 	}
 	return it
 }
@@ -96,7 +106,7 @@ func (it *Variable) Describe() graph.Description {
 	sort.Strings(fixed)
 	return graph.Description{
 		UID:  it.UID(),
-		Name: it.varName,
+		Name: fmt.Sprintf("%s for \"%s\" variable.", string(it.itType), it.varName),
 		Type: it.Type(),
 		Tags: fixed,
 		Size: s,
@@ -110,14 +120,16 @@ func (it *Variable) Type() graph.Type { return graph.Variable }
 // Contains is not defined for a bind variable.
 func (it *Variable) Contains(ctx *graph.IterationContext, v graph.Value) bool {
 	graph.ContainsLogIn(it, v)
-	if ctx.BindVariable(it.qs, it.varName) || it.isBinder {
-		panic("Reorder iterator tree for variables. Contains should not bind a variable.")
+
+	if it.itType == binder {
+		panic("Variable binders should not have their contains methods called.")
 	}
+
+	it.itType = user
 
 	if v == ctx.CurrentValue(it.varName) {
 		return graph.ContainsLogOut(it, v, true)
 	}
-
 	return graph.ContainsLogOut(it, v, false)
 
 }
@@ -126,20 +138,22 @@ func (it *Variable) Contains(ctx *graph.IterationContext, v graph.Value) bool {
 func (it *Variable) Next(ctx *graph.IterationContext) bool {
 	graph.NextLogIn(it)
 
-	if ctx.BindVariable(it.qs, it.varName) {
-		it.isBinder = true
+	if it.itType == user {
+		panic("Variable users should not have their next methods called.")
 	}
 
-	if it.isBinder {
-		if ctx.Next(it.varName) {
-			it.result = ctx.CurrentValue(it.varName)
-			return graph.NextLogOut(it, true)
-		}
-		it.result = nil
-		return graph.NextLogOut(it, false)
+	if !ctx.IsBound(it.varName) {
+		it.itType = binder
+		ctx.BindVariable(it.qs, it.varName)
 	}
 
-	panic("query should be reordered so that only binders call next")
+	if ctx.Next(it.varName) {
+
+		it.result = ctx.CurrentValue(it.varName)
+		return graph.NextLogOut(it, true)
+	}
+	it.result = nil
+	return graph.NextLogOut(it, false)
 }
 
 func (it *Variable) Err() error {

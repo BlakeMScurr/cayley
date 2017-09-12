@@ -231,11 +231,13 @@ func NewIterationContext() *IterationContext {
 	}
 }
 
+func (c *IterationContext) IsBound(varName string) bool {
+	val, ok := c.isBound[varName]
+	return ok && val
+}
+
 // BindVariable binds a variable if it has not already been bound.
 func (c *IterationContext) BindVariable(qs QuadStore, varName string) bool {
-	if val, ok := c.isBound[varName]; ok && val {
-		return false
-	}
 	c.isBound[varName] = true
 	c.subIts[varName] = qs.NodesAllIterator()
 	return true
@@ -299,25 +301,26 @@ type Type string
 
 // These are the iterator types, defined as constants
 const (
-	Invalid     = Type("")
-	All         = Type("all")
-	And         = Type("and")
-	Or          = Type("or")
-	HasA        = Type("hasa")
-	LinksTo     = Type("linksto")
-	Comparison  = Type("comparison")
-	Null        = Type("null")
-	Fixed       = Type("fixed")
-	Not         = Type("not")
-	Optional    = Type("optional")
-	Materialize = Type("materialize")
-	Unique      = Type("unique")
-	Limit       = Type("limit")
-	Skip        = Type("skip")
-	Regex       = Type("regexp")
-	Count       = Type("count")
-	Recursive   = Type("recursive")
-	Variable    = Type("variable")
+	Invalid           = Type("")
+	All               = Type("all")
+	And               = Type("and")
+	Or                = Type("or")
+	HasA              = Type("hasa")
+	LinksTo           = Type("linksto")
+	Comparison        = Type("comparison")
+	Null              = Type("null")
+	Fixed             = Type("fixed")
+	Not               = Type("not")
+	Optional          = Type("optional")
+	Materialize       = Type("materialize")
+	Unique            = Type("unique")
+	Limit             = Type("limit")
+	Skip              = Type("skip")
+	Regex             = Type("regexp")
+	Count             = Type("count")
+	Recursive         = Type("recursive")
+	Variable          = Type("variable")
+	VariableContainer = Type("variableContainer")
 )
 
 // String returns a string representation of the Type.

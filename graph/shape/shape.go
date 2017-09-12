@@ -1115,7 +1115,11 @@ func (s Optional) Optimize(r Optimizer) (Shape, bool) {
 type Variable string
 
 func (s Variable) BuildIterator(qs graph.QuadStore) graph.Iterator {
-	return iterator.NewVariable(qs, string(s))
+	return iterator.NewVariableContainer(
+		qs,
+		iterator.NewVariable(qs, string(s)),
+		string(s),
+	)
 }
 
 func (s Variable) Optimize(r Optimizer) (Shape, bool) {

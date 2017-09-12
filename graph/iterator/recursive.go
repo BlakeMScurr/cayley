@@ -99,6 +99,8 @@ func (it *Recursive) Reset() {
 
 	it.baseIt = it.qs.FixedIterator()
 	it.depth = 0
+	it.depthCache = []*valuesGivenVariables{}
+	it.currentIt = 0
 }
 
 func (it *Recursive) Tagger() *graph.Tagger {
