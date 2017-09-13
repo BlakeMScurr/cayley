@@ -102,22 +102,38 @@ func (it *VariableContainer) Type() graph.Type { return graph.VariableContainer 
 func (it *VariableContainer) Contains(ctx *graph.IterationContext, v graph.Value) bool {
 	graph.ContainsLogIn(it, v)
 
-	if it.itType == undetermined && !ctx.IsBound(it.name) {
-		it.ToBinder()
+	if it.itType == undetermined {
+		if !ctx.IsBound(it.name) {
+			it.ToBinder()
+		} else {
+			it.itType = user
+		}
 	}
 
-	return it.subIt.Contains(ctx, v)
+	res := it.subIt.Contains(ctx, v)
+	if res {
+		fmt.Println("Got out of contains.")
+	}
+	return res
 }
 
 // Next advances the value of the variableContainer on the iteration context.
 func (it *VariableContainer) Next(ctx *graph.IterationContext) bool {
 	graph.NextLogIn(it)
 
-	if it.itType == undetermined && ctx.IsBound(it.name) {
-		it.ToUser()
+	if it.itType == undetermined {
+		if !ctx.IsBound(it.name) {
+			it.ToBinder()
+		} else {
+			it.itType = user
+		}
 	}
 
-	return it.subIt.Next(ctx)
+	res := it.subIt.Next(ctx)
+	if res {
+		fmt.Println("Got out of next.")
+	}
+	return res
 }
 
 func (it *VariableContainer) Err() error {

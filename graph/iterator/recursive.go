@@ -1,11 +1,13 @@
 package iterator
 
 import (
+	"fmt"
 	"math"
 	"reflect"
 
 	"github.com/codelingo/cayley/graph"
 	"github.com/codelingo/cayley/quad"
+	"github.com/waigani/xxx"
 )
 
 // Recursive iterator takes a base iterator and a morphism to be applied recursively, for each result.
@@ -257,8 +259,16 @@ func (it *Recursive) Next(ctx *graph.IterationContext) bool {
 
 		break
 	}
-	ctx.SetValues(it.nextIts[it.currentIt].varVals)
-
+	vals := it.nextIts[it.currentIt].varVals
+	xxx.Dump(vals)
+	var str string
+	for _, v := range vals {
+		str += it.qs.NameOf(v).String()
+	}
+	fmt.Printf("Which has value: %s\n", str)
+	ctx.SetValues(vals)
+	it.vars = vals
+	fmt.Println(it.qs.NameOf(ctx.CurrentValue("arg")).String())
 	return graph.NextLogOut(it, true)
 }
 
@@ -292,6 +302,14 @@ func (it *Recursive) VarsUpdated(ctx *graph.IterationContext) bool {
 		// information away, it could be useful if we have the same var value at a
 		// later point.
 		if !reflect.DeepEqual(newVars, it.vars) {
+			fmt.Println("We had:")
+			for n, v := range it.vars {
+				fmt.Println(n + ": " + it.qs.NameOf(v).String())
+			}
+			fmt.Println("We have: ")
+			for n, v := range newVars {
+				fmt.Println(n + ": " + it.qs.NameOf(v).String())
+			}
 			it.vars = newVars
 			return true
 		}
