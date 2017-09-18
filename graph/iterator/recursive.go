@@ -156,20 +156,24 @@ func (it *Recursive) SubIterators() []graph.Iterator {
 func (it *Recursive) Next(ctx *graph.IterationContext) bool {
 	it.pathIndex = 0
 	if it.depth == 0 {
-		it.depthCache = append(it.depthCache, &valuesGivenVariables{
-			vars: ctx.Values(),
-		})
+		if ctx != nil {
+			it.depthCache = append(it.depthCache, &valuesGivenVariables{
+				vars: ctx.Values(),
+			})
+		}
 		for it.subIt.Next(ctx) {
 			res := it.subIt.Result()
-			variableValues := ctx.Values()
-			if it.VarsUpdated(ctx) {
-				last := len(it.depthCache) - 1
-				if len(it.depthCache[last].vals) == 0 {
-					it.depthCache = it.depthCache[:last]
+			if ctx != nil {
+				variableValues := ctx.Values()
+				if it.VarsUpdated(ctx) {
+					last := len(it.depthCache) - 1
+					if len(it.depthCache[last].vals) == 0 {
+						it.depthCache = it.depthCache[:last]
+					}
+					it.depthCache = append(it.depthCache, &valuesGivenVariables{
+						vars: variableValues,
+					})
 				}
-				it.depthCache = append(it.depthCache, &valuesGivenVariables{
-					vars: variableValues,
-				})
 			}
 
 			last := len(it.depthCache) - 1
@@ -255,7 +259,9 @@ func (it *Recursive) Next(ctx *graph.IterationContext) bool {
 
 		break
 	}
-	ctx.SetValues(it.nextIts[it.currentIt].varVals)
+	if ctx != nil {
+		ctx.SetValues(it.nextIts[it.currentIt].varVals)
+	}
 
 	return graph.NextLogOut(it, true)
 }
