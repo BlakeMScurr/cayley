@@ -166,6 +166,9 @@ func (it *Recursive) Next(ctx *graph.IterationContext) bool {
 		for it.subIt.Next(ctx) {
 			res := it.subIt.Result()
 			variableValues := ctx.Values()
+			if len(variableValues) == 1 {
+				fmt.Println("Nil stuff")
+			}
 			if it.VarsUpdated(ctx) {
 				last := len(it.depthCache) - 1
 				if len(it.depthCache[last].vals) == 0 {
@@ -265,10 +268,12 @@ func (it *Recursive) Next(ctx *graph.IterationContext) bool {
 	for _, v := range vals {
 		str += it.qs.NameOf(v).String()
 	}
+	if str == "" {
+		fmt.Println("Here we have set the value to zero.")
+	}
 	fmt.Printf("Which has value: %s\n", str)
 	ctx.SetValues(vals)
 	it.vars = vals
-	fmt.Println(it.qs.NameOf(ctx.CurrentValue("arg")).String())
 	return graph.NextLogOut(it, true)
 }
 

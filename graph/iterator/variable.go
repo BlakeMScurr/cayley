@@ -121,10 +121,12 @@ func (it *Variable) Type() graph.Type { return graph.Variable }
 func (it *Variable) Contains(ctx *graph.IterationContext, v graph.Value) bool {
 	graph.ContainsLogIn(it, v)
 
-	fmt.Printf("Contains: is %s contained in iterator with val %s\n",
-		it.qs.NameOf(v).String(),
-		it.qs.NameOf(ctx.CurrentValue(it.varName)).String(),
-	)
+	if ctx.CurrentValue(it.varName) != nil {
+		fmt.Printf("Contains: is %s contained in iterator with val %s\n",
+			it.qs.NameOf(v).String(),
+			it.qs.NameOf(ctx.CurrentValue(it.varName)).String(),
+		)
+	}
 
 	if it.itType == binder {
 		panic("Variable binders should not have their contains methods called.")
