@@ -111,9 +111,6 @@ func (it *VariableContainer) Contains(ctx *graph.IterationContext, v graph.Value
 	}
 
 	res := it.subIt.Contains(ctx, v)
-	if res {
-		fmt.Println("Got out of contains.")
-	}
 	return res
 }
 
@@ -130,9 +127,6 @@ func (it *VariableContainer) Next(ctx *graph.IterationContext) bool {
 	}
 
 	res := it.subIt.Next(ctx)
-	if res {
-		fmt.Println("Got out of next.")
-	}
 	return res
 }
 

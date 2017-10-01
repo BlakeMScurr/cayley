@@ -121,13 +121,6 @@ func (it *Variable) Type() graph.Type { return graph.Variable }
 func (it *Variable) Contains(ctx *graph.IterationContext, v graph.Value) bool {
 	graph.ContainsLogIn(it, v)
 
-	if ctx.CurrentValue(it.varName) != nil {
-		fmt.Printf("Contains: is %s contained in iterator with val %s\n",
-			it.qs.NameOf(v).String(),
-			it.qs.NameOf(ctx.CurrentValue(it.varName)).String(),
-		)
-	}
-
 	if it.itType == binder {
 		panic("Variable binders should not have their contains methods called.")
 	}
@@ -155,10 +148,6 @@ func (it *Variable) Next(ctx *graph.IterationContext) bool {
 	}
 
 	if ctx.Next(it.varName) {
-
-		fmt.Printf("Next: %s\n",
-			it.qs.NameOf(ctx.CurrentValue(it.varName)).String(),
-		)
 		it.result = ctx.CurrentValue(it.varName)
 		return graph.NextLogOut(it, true)
 	}
