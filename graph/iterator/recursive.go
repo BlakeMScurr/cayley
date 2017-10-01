@@ -178,6 +178,7 @@ func (it *Recursive) Next(ctx *graph.IterationContext) bool {
 				it.depthCache = append(it.depthCache, &valuesGivenVariables{
 					vars: ctx.Values(),
 				})
+
 			}
 
 			// TODO(prePR) Is the ref count not updating a sufficient argument for
