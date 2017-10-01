@@ -217,27 +217,31 @@ func DescribeIteratorTree(it Iterator, indentation string) {
 
 // IterationContext keeps state for a given iteration.  Currently it stores the values of variables.
 type IterationContext struct {
-	values     map[string]Value
-	isBound    map[string]bool
-	subIts     map[string]Iterator
-	tempValues map[string]Value
+	values           map[string]Value
+	isBound          map[string]bool
+	subIts           map[string]Iterator
+	tempValues       map[string]Value
+	referenceCounter int
 }
 
 func NewIterationContext() *IterationContext {
 	return &IterationContext{
-		values:  map[string]Value{},
-		isBound: map[string]bool{},
-		subIts:  map[string]Iterator{},
+		values:           map[string]Value{},
+		isBound:          map[string]bool{},
+		subIts:           map[string]Iterator{},
+		referenceCounter: 0,
 	}
 }
 
 func (c *IterationContext) IsBound(varName string) bool {
+	c.referenceCounter++
 	val, ok := c.isBound[varName]
 	return ok && val
 }
 
 // BindVariable binds a variable if it has not already been bound.
 func (c *IterationContext) BindVariable(qs QuadStore, varName string) bool {
+	c.referenceCounter++
 	c.isBound[varName] = true
 	c.subIts[varName] = qs.NodesAllIterator()
 	return true
@@ -245,11 +249,17 @@ func (c *IterationContext) BindVariable(qs QuadStore, varName string) bool {
 
 // Set the values of the variables to a given set
 func (c *IterationContext) SetValues(vals map[string]Value) {
+	c.referenceCounter++
 	c.tempValues = vals
+}
+
+func (c *IterationContext) RefCount() int {
+	return c.referenceCounter
 }
 
 // Values returns the current values of all the variables in this context
 func (c *IterationContext) Values() map[string]Value {
+	c.referenceCounter++
 	if c.tempValues != nil {
 		return c.tempValues
 	}
@@ -262,6 +272,7 @@ func (c *IterationContext) Values() map[string]Value {
 
 // CurrentValue gets the value of the variable of name varName
 func (c *IterationContext) CurrentValue(varName string) Value {
+	c.referenceCounter++
 	if c.tempValues != nil {
 		return c.tempValues[varName]
 	}
@@ -271,6 +282,7 @@ func (c *IterationContext) CurrentValue(varName string) Value {
 // Next calls next on the subiterator that provides the value source for the variable
 // of name varName
 func (c *IterationContext) Next(varName string) bool {
+	c.referenceCounter++
 	c.tempValues = nil
 	if c.subIts[varName].Next(c) {
 		c.values[varName] = c.subIts[varName].Result()

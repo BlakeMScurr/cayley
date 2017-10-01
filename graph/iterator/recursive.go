@@ -1,13 +1,12 @@
 package iterator
 
 import (
-	"fmt"
 	"math"
 	"reflect"
+	"strconv"
 
 	"github.com/codelingo/cayley/graph"
 	"github.com/codelingo/cayley/quad"
-	"github.com/waigani/xxx"
 )
 
 // Recursive iterator takes a base iterator and a morphism to be applied recursively, for each result.
@@ -36,6 +35,7 @@ type Recursive struct {
 	vars       map[string]graph.Value
 	minDepth   int
 	maxDepth   int
+	recNum     int
 }
 
 type itGivenVariables struct {
@@ -56,11 +56,14 @@ type seenAt struct {
 var _ graph.Iterator = &Recursive{}
 
 var MaxRecursiveSteps = 50
+var globRec = 0
 
 func NewRecursive(qs graph.QuadStore, it graph.Iterator, morphism graph.ApplyMorphism, max int) *Recursive {
+	globRec++
 	return &Recursive{
-		uid:   NextUID(),
-		subIt: it,
+		recNum: globRec,
+		uid:    NextUID(),
+		subIt:  it,
 
 		qs:       qs,
 		morphism: morphism,
@@ -160,27 +163,34 @@ func (it *Recursive) SubIterators() []graph.Iterator {
 func (it *Recursive) Next(ctx *graph.IterationContext) bool {
 	it.pathIndex = 0
 	if it.depth == 0 {
-		it.depthCache = append(it.depthCache, &valuesGivenVariables{
-			vars: ctx.Values(),
-		})
+		// TODO(prePR): is this necessary?
+		// Zeroth element contains the vals which do not depend on the value of the variables.
+		it.depthCache = append(it.depthCache, &valuesGivenVariables{})
+		rc := ctx.RefCount()
 		for it.subIt.Next(ctx) {
 			res := it.subIt.Result()
-			variableValues := ctx.Values()
-			if len(variableValues) == 1 {
-				fmt.Println("Nil stuff")
-			}
-			if it.VarsUpdated(ctx) {
-				last := len(it.depthCache) - 1
+			last := len(it.depthCache) - 1
+			if !reflect.DeepEqual(ctx.Values(), it.depthCache[last].vars) {
+				// TODO(prePR): can we just ensure that all vars sets have associated vals
 				if len(it.depthCache[last].vals) == 0 {
 					it.depthCache = it.depthCache[:last]
 				}
 				it.depthCache = append(it.depthCache, &valuesGivenVariables{
-					vars: variableValues,
+					vars: ctx.Values(),
 				})
 			}
 
-			last := len(it.depthCache) - 1
-			it.depthCache[last].vals = append(it.depthCache[last].vals, it.subIt.Result())
+			// TODO(prePR) Is the ref count not updating a sufficient argument for
+			// the result not depending on the variable?
+			var ind int
+			newRc := ctx.RefCount()
+			if rc != newRc {
+				rc = newRc
+				// TODO(prePR) Don't get last twice
+				ind = len(it.depthCache) - 1
+			}
+			it.depthCache[ind].vals = append(it.depthCache[ind].vals, it.subIt.Result())
+
 			tags := make(map[string]graph.Value)
 			it.subIt.TagResults(tags)
 			key := graph.ToKey(res)
@@ -262,18 +272,11 @@ func (it *Recursive) Next(ctx *graph.IterationContext) bool {
 
 		break
 	}
-	vals := it.nextIts[it.currentIt].varVals
-	xxx.Dump(vals)
-	var str string
-	for _, v := range vals {
-		str += it.qs.NameOf(v).String()
+	if len(it.nextIts[it.currentIt].varVals) != 0 {
+		vals := it.nextIts[it.currentIt].varVals
+		ctx.SetValues(vals)
+		it.vars = vals
 	}
-	if str == "" {
-		fmt.Println("Here we have set the value to zero.")
-	}
-	fmt.Printf("Which has value: %s\n", str)
-	ctx.SetValues(vals)
-	it.vars = vals
 	return graph.NextLogOut(it, true)
 }
 
@@ -307,14 +310,6 @@ func (it *Recursive) VarsUpdated(ctx *graph.IterationContext) bool {
 		// information away, it could be useful if we have the same var value at a
 		// later point.
 		if !reflect.DeepEqual(newVars, it.vars) {
-			fmt.Println("We had:")
-			for n, v := range it.vars {
-				fmt.Println(n + ": " + it.qs.NameOf(v).String())
-			}
-			fmt.Println("We have: ")
-			for n, v := range newVars {
-				fmt.Println(n + ": " + it.qs.NameOf(v).String())
-			}
 			it.vars = newVars
 			return true
 		}
@@ -414,5 +409,6 @@ func (it *Recursive) Describe() graph.Description {
 		Type:      it.Type(),
 		Tags:      it.tags.Tags(),
 		Iterators: subIts,
+		Name:      strconv.Itoa(it.recNum),
 	}
 }
